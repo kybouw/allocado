@@ -1,5 +1,4 @@
-// biome-ignore assist/source/organizeImports: auto organize keeps fighting me
-import { updateSession } from "@/utils/supabase/proxy";
+import { updateSession } from "@allocado/utils/supabase/proxy";
 import type { NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {

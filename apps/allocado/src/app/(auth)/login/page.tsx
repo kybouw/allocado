@@ -1,13 +1,15 @@
+// src/app/login/page.tsx
 import { login, signup } from "./actions";
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-[80vh] items-center justify-center px-4">
-      <form className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-gray-200 bg-white p-8 shadow-md">
-        <h1 className="text-2xl font-semibold text-gray-800 text-center">Welcome to Allocado</h1>
+    <main className="flex min-h-[80vh] items-center justify-center px-4 bg-avocado-50">
+      <form className="card w-full max-w-sm flex flex-col gap-5 p-8">
+        <h1 className="text-2xl font-semibold text-center text-avocado-800">Welcome to Allocado</h1>
 
+        {/* Email */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="email" className="text-sm font-medium text-gray-700">
+          <label htmlFor="email" className="text-sm font-medium text-avocado-700">
             Email
           </label>
           <input
@@ -16,12 +18,13 @@ export default function LoginPage() {
             type="email"
             required
             placeholder="you@example.com"
-            className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input-field"
           />
         </div>
 
+        {/* Password */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="password" className="text-sm font-medium text-gray-700">
+          <label htmlFor="password" className="text-sm font-medium text-avocado-700">
             Password
           </label>
           <input
@@ -30,23 +33,16 @@ export default function LoginPage() {
             type="password"
             required
             placeholder="••••••••"
-            className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input-field"
           />
         </div>
 
+        {/* Buttons */}
         <div className="mt-4 flex flex-col gap-2">
-          <button
-            formAction={login}
-            type="submit"
-            className="rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
-          >
+          <button formAction={login} type="submit" className="btn-primary">
             Log in
           </button>
-          <button
-            formAction={signup}
-            type="submit"
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-50 focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
-          >
+          <button formAction={signup} type="submit" className="btn-secondary">
             Sign up
           </button>
         </div>

@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@allocado/*": ["./src/*"]
+      "@allocado/*": ["./src/*"],
+      "@allocado/db": ["./src/db/index.ts"],
+      "@allocado/db/*": ["./src/db/*"]
     }
   },
   "include": [

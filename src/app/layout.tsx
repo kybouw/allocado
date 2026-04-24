@@ -1,7 +1,9 @@
 // src/app/layout.tsx
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Image from "next/image";
+import { QueryProvider } from "@allocado/providers/query";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,6 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <ClerkProvider>
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-avocado-50 text-avocado-900`}
@@ -58,16 +61,19 @@ export default function RootLayout({
 
         {/* Main content */}
         <main className="flex-1 w-full max-w-6xl mx-auto px-6 py-10">
-          <div className="card bg-(--color-surface)">{children}</div>
+          <div className="card bg-(--color-surface)">
+            <QueryProvider>{children}</QueryProvider>
+          </div>
         </main>
 
         {/* Footer */}
         <footer className="border-t border-avocado-200 bg-white/70 py-4 text-center text-sm text-avocado-700">
           © {new Date().getFullYear()}{" "}
           <span className="font-semibold text-avocado-800">Allocado</span> — built with Next.js &
-          Supabase
+          Clerk
         </footer>
       </body>
     </html>
+    </ClerkProvider>
   );
 }

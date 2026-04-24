@@ -1,1 +1,32 @@
-.env
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+*.ods
+NOTES.md
+
+# private seeds (personal ticker data)
+src/db/seed.local.ts
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

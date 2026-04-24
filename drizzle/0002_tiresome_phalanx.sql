@@ -1,0 +1,1 @@
+ALTER TYPE "public"."asset_class_type" ADD VALUE 'other';

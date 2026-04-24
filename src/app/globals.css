@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ---------- Base theme ---------- */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* 🥑 Allocado brand colors */
+  --color-avocado-50: #f4f8f4;
+  --color-avocado-100: #e8f3e8;
+  --color-avocado-200: #cce7cc;
+  --color-avocado-300: #a6d9a6;
+  --color-avocado-400: #6cc36c;
+  --color-avocado-500: #47a447; /* main avocado flesh */
+  --color-avocado-600: #3d8f3d;
+  --color-avocado-700: #2f6d2f;
+  --color-avocado-800: #255525;
+  --color-avocado-900: #1b3d1b;
+
+  --color-pit: #9b6230;
+  --color-coin: #f4b400;
+  --color-leaf: #3a7f45;
+
+  /* optional neutrals */
+  --color-surface: #fafafa;
+  --color-border: #e5e7eb;
+}
+
+/* ---------- Tailwind @theme mapping ---------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-avocado-50: var(--color-avocado-50);
+  --color-avocado-100: var(--color-avocado-100);
+  --color-avocado-200: var(--color-avocado-200);
+  --color-avocado-300: var(--color-avocado-300);
+  --color-avocado-400: var(--color-avocado-400);
+  --color-avocado-500: var(--color-avocado-500);
+  --color-avocado-600: var(--color-avocado-600);
+  --color-avocado-700: var(--color-avocado-700);
+  --color-avocado-800: var(--color-avocado-800);
+  --color-avocado-900: var(--color-avocado-900);
+
+  --color-pit: var(--color-pit);
+  --color-coin: var(--color-coin);
+  --color-leaf: var(--color-leaf);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ---------- Global styles ---------- */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ---------- Reusable component classes ---------- */
+@layer components {
+  .btn-primary {
+    @apply rounded-md bg-[var(--color-avocado-600)] px-4 py-2 font-medium text-white hover:bg-[var(--color-avocado-700)] focus:ring-2 focus:ring-[var(--color-avocado-400)] focus:ring-offset-1 transition;
+  }
+
+  .btn-secondary {
+    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-4 py-2 font-medium text-[var(--color-avocado-700)] hover:bg-[var(--color-avocado-50)] transition;
+  }
+
+  .input-field {
+    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-3 py-2 text-gray-900 focus:border-[var(--color-avocado-500)] focus:ring-1 focus:ring-[var(--color-avocado-500)] focus:outline-none;
+  }
+
+  .card {
+    @apply rounded-xl border border-[var(--color-avocado-100)] bg-white shadow-sm p-6;
+  }
+}

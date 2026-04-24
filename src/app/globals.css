@@ -51,20 +51,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ---------- Dark mode overrides ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-
-    /* shift avocado tones slightly deeper for contrast */
-    --color-avocado-500: #5bb45b;
-    --color-avocado-700: #2e6b2e;
-    --color-border: #333;
-    --color-surface: #121212;
-  }
-}
-
 /* ---------- Global styles ---------- */
 body {
   background: var(--background);
@@ -75,20 +61,15 @@ body {
 /* ---------- Reusable component classes ---------- */
 @layer components {
   .btn-primary {
-    @apply rounded-md bg-[var(--color-avocado-600)] px-4 py-2 font-medium text-white
-      hover:bg-[var(--color-avocado-700)] focus:ring-2 focus:ring-[var(--color-avocado-400)]
-      focus:ring-offset-1 transition;
+    @apply rounded-md bg-[var(--color-avocado-600)] px-4 py-2 font-medium text-white hover:bg-[var(--color-avocado-700)] focus:ring-2 focus:ring-[var(--color-avocado-400)] focus:ring-offset-1 transition;
   }
 
   .btn-secondary {
-    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-4 py-2
-      font-medium text-[var(--color-avocado-700)] hover:bg-[var(--color-avocado-50)] transition;
+    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-4 py-2 font-medium text-[var(--color-avocado-700)] hover:bg-[var(--color-avocado-50)] transition;
   }
 
   .input-field {
-    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-3 py-2
-      text-gray-900 focus:border-[var(--color-avocado-500)]
-      focus:ring-1 focus:ring-[var(--color-avocado-500)] focus:outline-none;
+    @apply rounded-md border border-[var(--color-avocado-300)] bg-white px-3 py-2 text-gray-900 focus:border-[var(--color-avocado-500)] focus:ring-1 focus:ring-[var(--color-avocado-500)] focus:outline-none;
   }
 
   .card {

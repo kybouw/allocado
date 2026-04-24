@@ -1,6 +1,6 @@
 {
-  "id": "8c29adbb-bf48-4980-b63c-76ac25ddb512",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "2aa529f8-0699-4567-86a7-9ca8bc85dc82",
+  "prevId": "a7d546f9-9ed8-4153-a099-6c9cd5ba3d44",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -439,6 +439,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -564,7 +571,7 @@
     "public.asset_class_type": {
       "name": "asset_class_type",
       "schema": "public",
-      "values": ["stock", "bond", "cash"]
+      "values": ["stock", "bond", "cash", "other"]
     }
   },
   "schemas": {},

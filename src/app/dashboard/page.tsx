@@ -77,7 +77,43 @@ export default async function DashboardPage() {
       const otherCurrent = current.get(otherId) ?? 0;
 
       const duration = computeWeightedBondDuration(holdings, assets);
-      const accountCount = accounts.filter((a) => a.goalId === g.id).length;
+      const goalAccts = accounts.filter((a) => a.goalId === g.id);
+      const accountCount = goalAccts.length;
+
+      const holdingsByAccount = new Map<string, typeof holdings>();
+      for (const h of holdings) {
+        const list = holdingsByAccount.get(h.accountId) ?? [];
+        list.push(h);
+        holdingsByAccount.set(h.accountId, list);
+      }
+
+      const fundedAccounts = goalAccts.filter((a) => holdingsByAccount.has(a.id));
+
+      const accountBreakdowns: AccountBreakdown[] =
+        fundedAccounts.length >= 2
+          ? fundedAccounts.map((acct) => {
+              const acctHoldings = holdingsByAccount.get(acct.id) ?? [];
+              const acctTotal = computeGoalTotal(acctHoldings);
+              const acctDollars = computeClassDollars(acctHoldings, aggregateAllocs);
+              const acctCurrent = computeClassFractions(acctDollars, acctTotal);
+              const acctTargeted = TARGETED.map((name) => {
+                const id = aggregateIds.get(name) ?? "";
+                return {
+                  name,
+                  current: acctCurrent.get(id) ?? 0,
+                  target: activeTargets.get(id) ?? 0,
+                };
+              });
+              return {
+                accountId: acct.id,
+                accountName: acct.name,
+                accountType: acct.accountType,
+                total: acctTotal,
+                targeted: acctTargeted,
+                otherCurrent: acctCurrent.get(otherId) ?? 0,
+              };
+            })
+          : [];
 
       return {
         goal: g,
@@ -86,6 +122,7 @@ export default async function DashboardPage() {
         otherCurrent,
         duration,
         accountCount,
+        accountBreakdowns,
         hasHoldings: holdings.length > 0,
       };
     }),
@@ -117,7 +154,16 @@ export default async function DashboardPage() {
 
       <div className="flex flex-col gap-6">
         {goalCards.map(
-          ({ goal, total, targeted, otherCurrent, duration, accountCount, hasHoldings }) => {
+          ({
+            goal,
+            total,
+            targeted,
+            otherCurrent,
+            duration,
+            accountCount,
+            accountBreakdowns,
+            hasHoldings,
+          }) => {
             const hasTargets = targeted.some((b) => b.target > 0);
 
             return (
@@ -154,12 +200,17 @@ export default async function DashboardPage() {
                     </Link>
                   </p>
                 ) : (
-                  <AllocationBars
-                    targeted={targeted}
-                    otherCurrent={otherCurrent}
-                    hasTargets={hasTargets}
-                    goalId={goal.id}
-                  />
+                  <>
+                    <AllocationBars
+                      targeted={targeted}
+                      otherCurrent={otherCurrent}
+                      hasTargets={hasTargets}
+                      goalId={goal.id}
+                    />
+                    {accountBreakdowns.length >= 2 && (
+                      <AccountBreakdownTable accounts={accountBreakdowns} />
+                    )}
+                  </>
                 )}
               </section>
             );
@@ -171,6 +222,24 @@ export default async function DashboardPage() {
 }
 
 type TargetedSlice = { name: TargetedName; current: number; target: number };
+
+type AccountBreakdown = {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  total: string;
+  targeted: TargetedSlice[];
+  otherCurrent: number;
+};
+
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  taxable: "Taxable",
+  ira: "IRA",
+  roth_ira: "Roth IRA",
+  "401k": "401(k)",
+  hsa: "HSA",
+  other: "Other",
+};
 
 const ROW_H = "h-9";
 
@@ -321,5 +390,88 @@ function StackedBar({
         );
       })}
     </div>
+  );
+}
+
+function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown[] }) {
+  const showOther = accounts.some((a) => a.otherCurrent > 0.001);
+  const colClass = showOther ? "grid-cols-4" : "grid-cols-3";
+  const tableWidth = showOther ? "w-64" : "w-52";
+
+  return (
+    <details className="group mt-1">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-1 text-xs text-avocado-500 hover:text-avocado-700">
+        <span className="transition-transform group-open:rotate-90">▸</span>
+        Breakdown by account
+      </summary>
+
+      <div className="mt-3 flex flex-col divide-y divide-avocado-100">
+        <div className="flex items-end gap-6 pb-1">
+          <div className="min-w-0 flex-1" />
+          <div className={`${tableWidth} shrink-0`}>
+            <div className={`grid ${colClass} text-center`}>
+              {TARGETED.map((name) => (
+                <span key={name} className="text-xs font-medium text-avocado-600">
+                  {name}
+                </span>
+              ))}
+              {showOther && <span className="text-xs font-medium text-purple-500">Other</span>}
+            </div>
+          </div>
+        </div>
+
+        {accounts.map((acct) => {
+          const isTaxAdvantaged = ["ira", "roth_ira", "401k", "hsa"].includes(acct.accountType);
+          const currentSlices: Array<{ name: AggregateName; pct: number }> = [
+            ...acct.targeted.map((b) => ({ name: b.name as AggregateName, pct: b.current })),
+            ...(showOther && acct.otherCurrent > 0.001
+              ? [{ name: OTHER_NAME as AggregateName, pct: acct.otherCurrent }]
+              : []),
+          ];
+
+          return (
+            <div key={acct.accountId} className="flex items-center gap-6 py-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/accounts/${acct.accountId}`}
+                    className="truncate text-xs font-medium text-avocado-800 hover:underline"
+                  >
+                    {acct.accountName}
+                  </Link>
+                  <span
+                    className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-medium ${
+                      isTaxAdvantaged ? "bg-amber-50 text-pit" : "bg-avocado-50 text-avocado-500"
+                    }`}
+                  >
+                    {ACCOUNT_TYPE_LABELS[acct.accountType] ?? acct.accountType}
+                  </span>
+                  <span className="ml-auto shrink-0 text-xs text-avocado-700">
+                    {formatUSD(acct.total)}
+                  </span>
+                </div>
+                <StackedBar slices={currentSlices} />
+              </div>
+
+              <div className={`${tableWidth} shrink-0`}>
+                <div className={`grid ${colClass} items-center text-center text-xs`}>
+                  {acct.targeted.map((b) => (
+                    <span key={b.name} className="text-avocado-800">
+                      {formatPercent(b.current)}
+                    </span>
+                  ))}
+                  {showOther &&
+                    (acct.otherCurrent > 0.001 ? (
+                      <span className="text-purple-600">{formatPercent(acct.otherCurrent)}</span>
+                    ) : (
+                      <span className="text-avocado-300">—</span>
+                    ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }

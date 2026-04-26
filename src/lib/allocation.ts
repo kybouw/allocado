@@ -122,9 +122,10 @@ export function resolveActiveTargets(
 }
 
 /**
- * Weighted average bond duration across a goal's holdings.
- * Uses asset.avgDurationYears directly (falls back to 0 for equities/cash).
- * Weight = holding value. Returns years or null if no bond exposure.
+ * Weighted average duration across all of a goal's holdings.
+ * Bonds use their avgDurationYears; cash and equity count as 0.
+ * Weight = holding value. Returns null when no bond exposure exists
+ * (so the stat is hidden for equity-only or cash-only portfolios).
  */
 export function computeWeightedBondDuration(
   holdings: HoldingRow[],
@@ -132,15 +133,18 @@ export function computeWeightedBondDuration(
 ): number | null {
   const byId = new Map(assets.map((a) => [a.id, a.avgDurationYears] as const));
   let weightedSum = 0;
-  let totalWeight = 0;
+  let totalValue = 0;
+  let hasBonds = false;
   for (const h of holdings) {
+    const v = Number(h.value);
+    if (!Number.isFinite(v) || v <= 0) continue;
+    totalValue += v;
     const dur = byId.get(h.assetId);
     if (dur == null) continue;
     const d = Number(dur);
-    const v = Number(h.value);
-    if (!Number.isFinite(d) || !Number.isFinite(v) || d === 0) continue;
+    if (!Number.isFinite(d) || d === 0) continue;
     weightedSum += d * v;
-    totalWeight += v;
+    hasBonds = true;
   }
-  return totalWeight === 0 ? null : weightedSum / totalWeight;
+  return hasBonds && totalValue > 0 ? weightedSum / totalValue : null;
 }

@@ -1,4 +1,5 @@
 import { deleteGoal, updateGoal } from "@allocado/app/_actions/goals";
+import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccountsForGoal } from "@allocado/db/queries/accounts";
 import { listAssetClassesForUser } from "@allocado/db/queries/assets";
@@ -165,12 +166,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             await deleteGoal(goalId);
           }}
         >
-          <button
-            type="submit"
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-          >
-            Delete goal
-          </button>
+          <DestructiveButton type="submit">Delete goal</DestructiveButton>
         </form>
       </section>
     </div>

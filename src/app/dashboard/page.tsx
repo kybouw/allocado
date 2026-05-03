@@ -182,9 +182,7 @@ export default async function DashboardPage() {
                       </span>
                       {goal.targetDate && <span>target {goal.targetDate}</span>}
                       {duration != null && (
-                        <span
-                          title="Weighted average duration across all holdings — bonds at their duration, cash and equity counted as 0 years"
-                        >
+                        <span title="Weighted average duration across all holdings — bonds at their duration, cash and equity counted as 0 years">
                           avg duration {duration.toFixed(2)} yr
                         </span>
                       )}

@@ -1,9 +1,17 @@
 import { deleteAsset, updateAsset } from "@allocado/app/_actions/assets";
+import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAssetWithClasses, listAssetClassesForUser } from "@allocado/db/queries/assets";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AssetClassEditor } from "./AssetClassEditor";
+
+type AllocationRow = {
+  classId: string;
+  className: string;
+  classType: string;
+  ratio: string;
+};
 
 export default async function AssetDetailPage({
   params,
@@ -23,23 +31,25 @@ export default async function AssetDetailPage({
   const first = rows[0];
   const isOwned = first.assetUserId === userId;
 
-  // Deduplicate allocations
-  const allocations = rows
-    .filter((r) => r.classId != null)
-    .reduce(
-      (acc, r) => {
-        if (!acc.find((a) => a.classId === r.classId)) {
-          acc.push({
-            classId: r.classId!,
-            className: r.className!,
-            classType: r.classType!,
-            ratio: r.ratio!,
-          });
-        }
-        return acc;
-      },
-      [] as Array<{ classId: string; className: string; classType: string; ratio: string }>,
-    );
+  const seen = new Set<string>();
+  const allocations: AllocationRow[] = [];
+  for (const r of rows) {
+    if (
+      r.classId != null &&
+      r.className != null &&
+      r.classType != null &&
+      r.ratio != null &&
+      !seen.has(r.classId)
+    ) {
+      seen.add(r.classId);
+      allocations.push({
+        classId: r.classId,
+        className: r.className,
+        classType: r.classType,
+        ratio: r.ratio,
+      });
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -143,12 +153,7 @@ export default async function AssetDetailPage({
                 if (res.ok) redirect("/assets");
               }}
             >
-              <button
-                type="submit"
-                className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-              >
-                Delete asset
-              </button>
+              <DestructiveButton type="submit">Delete asset</DestructiveButton>
             </form>
           </section>
         </>

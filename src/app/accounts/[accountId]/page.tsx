@@ -1,4 +1,5 @@
 import { deleteAccount, updateAccount } from "@allocado/app/_actions/accounts";
+import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAccount } from "@allocado/db/queries/accounts";
 import { listAssetsForUser } from "@allocado/db/queries/assets";
@@ -147,12 +148,7 @@ export default async function AccountDetailPage({
             await deleteAccount(accountId);
           }}
         >
-          <button
-            type="submit"
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-          >
-            Delete account (and all its holdings)
-          </button>
+          <DestructiveButton type="submit">Delete account (and all its holdings)</DestructiveButton>
         </form>
       </section>
     </div>

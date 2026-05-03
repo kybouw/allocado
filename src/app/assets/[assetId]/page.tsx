@@ -1,4 +1,5 @@
 import { deleteAsset, updateAsset } from "@allocado/app/_actions/assets";
+import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAssetWithClasses, listAssetClassesForUser } from "@allocado/db/queries/assets";
 import Link from "next/link";
@@ -143,12 +144,7 @@ export default async function AssetDetailPage({
                 if (res.ok) redirect("/assets");
               }}
             >
-              <button
-                type="submit"
-                className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-              >
-                Delete asset
-              </button>
+              <DestructiveButton type="submit">Delete asset</DestructiveButton>
             </form>
           </section>
         </>

@@ -1,3 +1,4 @@
+import { Card, CardContent, CardHeader } from "@allocado/components/ui/card";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccounts } from "@allocado/db/queries/accounts";
 import {
@@ -118,6 +119,8 @@ export default async function DashboardPage() {
       return {
         goal: g,
         total,
+        classDollars,
+        holdings,
         targeted,
         otherCurrent,
         duration,
@@ -129,6 +132,27 @@ export default async function DashboardPage() {
   );
 
   const portfolioTotal = goalCards.reduce((acc, c) => acc + Number(c.total), 0);
+
+  // Aggregate allocation across all goals
+  const totalClassDollars = new Map<string, number>();
+  for (const card of goalCards) {
+    for (const [classId, dollars] of card.classDollars) {
+      totalClassDollars.set(classId, (totalClassDollars.get(classId) ?? 0) + dollars);
+    }
+  }
+  const portfolioFractions = computeClassFractions(totalClassDollars, String(portfolioTotal));
+  const otherId = aggregateIds.get(OTHER_NAME) ?? "";
+  const portfolioTargeted = TARGETED.map((name) => {
+    const id = aggregateIds.get(name) ?? "";
+    return { name, current: portfolioFractions.get(id) ?? 0 };
+  });
+  const portfolioOtherCurrent = portfolioFractions.get(otherId) ?? 0;
+  const portfolioHasAllocation =
+    portfolioTargeted.some((b) => b.current > 0) || portfolioOtherCurrent > 0.001;
+
+  // Portfolio-wide weighted average bond duration
+  const allHoldings = goalCards.flatMap((c) => c.holdings);
+  const portfolioDuration = computeWeightedBondDuration(allHoldings, assets);
 
   if (goals.length === 0) {
     return (
@@ -147,9 +171,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <p className="text-sm uppercase tracking-wide text-avocado-600">Total portfolio value</p>
-        <h1 className="text-4xl font-semibold text-avocado-900">{formatUSD(portfolioTotal)}</h1>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm uppercase tracking-wide text-avocado-600">Total portfolio value</p>
+          <h1 className="text-4xl font-semibold text-avocado-900">{formatUSD(portfolioTotal)}</h1>
+          {portfolioDuration != null && (
+            <p
+              className="text-xs text-avocado-600"
+              title="Weighted average duration across all holdings"
+            >
+              avg duration {portfolioDuration.toFixed(2)} yr
+            </p>
+          )}
+        </div>
+        {portfolioHasAllocation && (
+          <PortfolioAllocationBars
+            targeted={portfolioTargeted}
+            otherCurrent={portfolioOtherCurrent}
+          />
+        )}
       </header>
 
       <div className="flex flex-col gap-6">
@@ -167,56 +207,60 @@ export default async function DashboardPage() {
             const hasTargets = targeted.some((b) => b.target > 0);
 
             return (
-              <section key={goal.id} className="card flex flex-col gap-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <Link
-                      href={`/goals/${goal.id}`}
-                      className="text-xl font-semibold text-avocado-900 hover:underline"
-                    >
-                      {goal.name}
-                    </Link>
-                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-avocado-600">
-                      <span>
-                        {accountCount} account{accountCount === 1 ? "" : "s"}
-                      </span>
-                      {goal.targetDate && <span>target {goal.targetDate}</span>}
-                      {duration != null && (
-                        <span title="Weighted average duration across all holdings — bonds at their duration, cash and equity counted as 0 years">
-                          avg duration {duration.toFixed(2)} yr
+              <Card key={goal.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <Link
+                        href={`/goals/${goal.id}`}
+                        className="text-xl font-semibold text-avocado-900 hover:underline"
+                      >
+                        {goal.name}
+                      </Link>
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-avocado-600">
+                        <span>
+                          {accountCount} account{accountCount === 1 ? "" : "s"}
                         </span>
-                      )}
+                        {goal.targetDate && <span>target {goal.targetDate}</span>}
+                        {duration != null && (
+                          <span title="Weighted average duration across all holdings — bonds at their duration, cash and equity counted as 0 years">
+                            avg duration {duration.toFixed(2)} yr
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs uppercase tracking-wide text-avocado-600">Total</div>
+                      <div className="text-2xl font-semibold text-avocado-900">
+                        {formatUSD(total)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs uppercase tracking-wide text-avocado-600">Total</div>
-                    <div className="text-2xl font-semibold text-avocado-900">
-                      {formatUSD(total)}
-                    </div>
-                  </div>
-                </div>
+                </CardHeader>
 
-                {!hasHoldings ? (
-                  <p className="text-sm text-avocado-700">
-                    No holdings yet.{" "}
-                    <Link href="/accounts" className="underline">
-                      Add holdings →
-                    </Link>
-                  </p>
-                ) : (
-                  <>
-                    <AllocationBars
-                      targeted={targeted}
-                      otherCurrent={otherCurrent}
-                      hasTargets={hasTargets}
-                      goalId={goal.id}
-                    />
-                    {accountBreakdowns.length >= 2 && (
-                      <AccountBreakdownTable accounts={accountBreakdowns} />
-                    )}
-                  </>
-                )}
-              </section>
+                <CardContent className="flex flex-col gap-4">
+                  {!hasHoldings ? (
+                    <p className="text-sm text-avocado-700">
+                      No holdings yet.{" "}
+                      <Link href="/accounts" className="underline">
+                        Add holdings →
+                      </Link>
+                    </p>
+                  ) : (
+                    <>
+                      <AllocationBars
+                        targeted={targeted}
+                        otherCurrent={otherCurrent}
+                        hasTargets={hasTargets}
+                        goalId={goal.id}
+                      />
+                      {accountBreakdowns.length >= 2 && (
+                        <AccountBreakdownTable accounts={accountBreakdowns} />
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
             );
           },
         )}
@@ -226,6 +270,7 @@ export default async function DashboardPage() {
 }
 
 type TargetedSlice = { name: TargetedName; current: number; target: number };
+type PortfolioSlice = { name: TargetedName; current: number };
 
 type AccountBreakdown = {
   accountId: string;
@@ -246,6 +291,39 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 };
 
 const ROW_H = "h-9";
+
+function PortfolioAllocationBars({
+  targeted,
+  otherCurrent,
+}: {
+  targeted: PortfolioSlice[];
+  otherCurrent: number;
+}) {
+  const showOther = otherCurrent > 0.001;
+
+  const slices: Array<{ name: AggregateName; pct: number }> = [
+    ...targeted.map((b) => ({ name: b.name as AggregateName, pct: b.current })),
+    ...(showOther ? [{ name: OTHER_NAME as AggregateName, pct: otherCurrent }] : []),
+  ];
+
+  const legendItems = slices.filter((s) => s.pct > 0.001);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <StackedBar slices={slices} />
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {legendItems.map((item) => (
+          <div key={item.name} className="flex items-center gap-1.5">
+            <div className={`h-2.5 w-2.5 rounded-sm ${COLORS[item.name]}`} />
+            <span className="text-xs text-avocado-700">
+              {item.name} {formatPercent(item.pct)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function AllocationBars({
   targeted,

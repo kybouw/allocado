@@ -30,6 +30,15 @@
   --card-foreground: #1b3d1b;
   --border: #e8f3e8;
   --muted-foreground: #3d8f3d;
+
+  /* shadcn component tokens */
+  --destructive: #dc2626;
+  --accent: var(--color-avocado-50);
+  --accent-foreground: var(--color-avocado-900);
+  --ring: var(--color-avocado-400);
+  --popover: #ffffff;
+  --popover-foreground: #1b3d1b;
+  --radius: 0.5rem;
 }
 
 /* ---------- Tailwind @theme mapping ---------- */
@@ -59,6 +68,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
   --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
 }
 
 /* ---------- Global styles ---------- */

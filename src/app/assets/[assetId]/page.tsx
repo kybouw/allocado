@@ -1,9 +1,9 @@
 import { deleteAsset, updateAsset } from "@allocado/app/_actions/assets";
-import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
+import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAssetWithClasses, listAssetClassesForUser } from "@allocado/db/queries/assets";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { AssetClassEditor } from "./AssetClassEditor";
 
 type AllocationRow = {
@@ -60,11 +60,22 @@ export default async function AssetDetailPage({
         >
           ← Asset library
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-avocado-900">
-          <span className="font-mono">{first.ticker}</span>
-          <span className="ml-3 text-lg font-normal text-avocado-700">{first.assetName}</span>
-        </h1>
-        {!isOwned && <p className="mt-1 text-xs text-avocado-500">System asset — read-only</p>}
+        <div className="mt-2 flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold text-avocado-900">
+              <span className="font-mono">{first.ticker}</span>
+              <span className="ml-3 text-lg font-normal text-avocado-700">{first.assetName}</span>
+            </h1>
+            {!isOwned && <p className="mt-1 text-xs text-avocado-500">System asset — read-only</p>}
+          </div>
+          {isOwned && (
+            <DeleteButton
+              action={deleteAsset.bind(null, assetId)}
+              redirectPath="/assets"
+              itemLabel="asset"
+            />
+          )}
+        </div>
       </header>
 
       {isOwned ? (
@@ -142,19 +153,6 @@ export default async function AssetDetailPage({
                 ratio: Number(a.ratio),
               }))}
             />
-          </section>
-
-          <section className="card flex flex-col gap-4 border-red-200">
-            <h2 className="text-lg font-medium text-red-700">Danger zone</h2>
-            <form
-              action={async () => {
-                "use server";
-                const res = await deleteAsset(assetId);
-                if (res.ok) redirect("/assets");
-              }}
-            >
-              <DestructiveButton type="submit">Delete asset</DestructiveButton>
-            </form>
           </section>
         </>
       ) : (

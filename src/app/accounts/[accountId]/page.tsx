@@ -1,12 +1,12 @@
 import { deleteAccount, updateAccount } from "@allocado/app/_actions/accounts";
-import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
+import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAccount } from "@allocado/db/queries/accounts";
 import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { HoldingsEditor } from "./HoldingsEditor";
 
 const ACCOUNT_TYPES = [
@@ -43,11 +43,20 @@ export default async function AccountDetailPage({
         >
           ← All accounts
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-avocado-900">{account.name}</h1>
-        <p className="text-sm text-avocado-700">
-          {account.accountType}
-          {account.institution ? ` · ${account.institution}` : ""}
-        </p>
+        <div className="mt-2 flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold text-avocado-900">{account.name}</h1>
+            <p className="text-sm text-avocado-700">
+              {account.accountType}
+              {account.institution ? ` · ${account.institution}` : ""}
+            </p>
+          </div>
+          <DeleteButton
+            action={deleteAccount.bind(null, accountId)}
+            redirectPath="/accounts"
+            itemLabel="account"
+          />
+        </div>
       </header>
 
       <section className="card flex flex-col gap-4">
@@ -138,19 +147,6 @@ export default async function AccountDetailPage({
             value: h.value,
           }))}
         />
-      </section>
-
-      <section className="card flex flex-col gap-4 border-red-200">
-        <h2 className="text-lg font-medium text-red-700">Danger zone</h2>
-        <form
-          action={async () => {
-            "use server";
-            const res = await deleteAccount(accountId);
-            if (res.ok) redirect("/accounts");
-          }}
-        >
-          <DestructiveButton type="submit">Delete account (and all its holdings)</DestructiveButton>
-        </form>
       </section>
     </div>
   );

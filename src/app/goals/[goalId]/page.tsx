@@ -1,12 +1,12 @@
 import { deleteGoal, updateGoal } from "@allocado/app/_actions/goals";
-import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
+import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccountsForGoal } from "@allocado/db/queries/accounts";
 import { listAssetClassesForUser } from "@allocado/db/queries/assets";
 import { getGoal } from "@allocado/db/queries/goals";
 import { listTargetsForGoal } from "@allocado/db/queries/targets";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { TargetsEditor } from "./TargetsEditor";
 
 export default async function GoalDetailPage({ params }: { params: Promise<{ goalId: string }> }) {
@@ -41,18 +41,25 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex items-start justify-between gap-6">
-        <div>
-          <Link
-            href="/goals"
-            className="text-sm text-avocado-600 hover:text-avocado-900 hover:underline"
-          >
-            ← All goals
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-avocado-900">{goal.name}</h1>
-          {goal.targetDate && (
-            <p className="text-sm text-avocado-700">Target date: {goal.targetDate}</p>
-          )}
+      <header>
+        <Link
+          href="/goals"
+          className="text-sm text-avocado-600 hover:text-avocado-900 hover:underline"
+        >
+          ← All goals
+        </Link>
+        <div className="mt-2 flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold text-avocado-900">{goal.name}</h1>
+            {goal.targetDate && (
+              <p className="text-sm text-avocado-700">Target date: {goal.targetDate}</p>
+            )}
+          </div>
+          <DeleteButton
+            action={deleteGoal.bind(null, goalId)}
+            redirectPath="/goals"
+            itemLabel="goal"
+          />
         </div>
       </header>
 
@@ -156,19 +163,6 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="card flex flex-col gap-4 border-red-200">
-        <h2 className="text-lg font-medium text-red-700">Danger zone</h2>
-        <form
-          action={async () => {
-            "use server";
-            const res = await deleteGoal(goalId);
-            if (res.ok) redirect("/goals");
-          }}
-        >
-          <DestructiveButton type="submit">Delete goal</DestructiveButton>
-        </form>
       </section>
     </div>
   );

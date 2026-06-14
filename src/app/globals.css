@@ -24,7 +24,12 @@
 
   /* optional neutrals */
   --color-surface: #fafafa;
-  --color-border: #e5e7eb;
+
+  /* shadcn card + border tokens */
+  --card: #ffffff;
+  --card-foreground: #1b3d1b;
+  --border: #e8f3e8;
+  --muted-foreground: #3d8f3d;
 }
 
 /* ---------- Tailwind @theme mapping ---------- */
@@ -49,9 +54,20 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted-foreground: var(--muted-foreground);
 }
 
 /* ---------- Global styles ---------- */
+@layer base {
+  * {
+    border-color: var(--color-border, currentColor);
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

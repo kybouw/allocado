@@ -6,7 +6,7 @@ import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { HoldingsEditor } from "./HoldingsEditor";
 
 const ACCOUNT_TYPES = [
@@ -145,7 +145,8 @@ export default async function AccountDetailPage({
         <form
           action={async () => {
             "use server";
-            await deleteAccount(accountId);
+            const res = await deleteAccount(accountId);
+            if (res.ok) redirect("/accounts");
           }}
         >
           <DestructiveButton type="submit">Delete account (and all its holdings)</DestructiveButton>

@@ -6,7 +6,7 @@ import { listAssetClassesForUser } from "@allocado/db/queries/assets";
 import { getGoal } from "@allocado/db/queries/goals";
 import { listTargetsForGoal } from "@allocado/db/queries/targets";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { TargetsEditor } from "./TargetsEditor";
 
 export default async function GoalDetailPage({ params }: { params: Promise<{ goalId: string }> }) {
@@ -163,7 +163,8 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
         <form
           action={async () => {
             "use server";
-            await deleteGoal(goalId);
+            const res = await deleteGoal(goalId);
+            if (res.ok) redirect("/goals");
           }}
         >
           <DestructiveButton type="submit">Delete goal</DestructiveButton>

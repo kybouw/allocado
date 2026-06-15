@@ -1,4 +1,5 @@
-import { ToastProvider } from "@allocado/components/ui/Toast";
+import { Toaster } from "@allocado/components/ui/sonner";
+import { TooltipProvider } from "@allocado/components/ui/tooltip";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -32,7 +33,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-avocado-50 text-avocado-900`}
         >
-          <ToastProvider>
+          <TooltipProvider>
             <header className="border-b border-avocado-200 bg-white/80 backdrop-blur-md">
               <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
                 <Link href="/dashboard" className="flex items-center gap-2">
@@ -83,7 +84,8 @@ export default function RootLayout({
               © {new Date().getFullYear()}{" "}
               <span className="font-semibold text-avocado-800">Allocado</span>
             </footer>
-          </ToastProvider>
+            <Toaster />
+          </TooltipProvider>
         </body>
       </html>
     </ClerkProvider>

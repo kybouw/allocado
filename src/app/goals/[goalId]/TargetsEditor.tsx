@@ -1,6 +1,7 @@
 "use client";
 
 import { setStaticTargets } from "@allocado/app/_actions/targets";
+import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton";
 import { useMemo, useState, useTransition } from "react";
 
 type AssetClass = {
@@ -107,13 +108,10 @@ export function TargetsEditor({
                     className="input-field w-24"
                   />
                   <span className="text-sm text-avocado-700">%</span>
-                  <button
-                    type="button"
+                  <RemoveRowButton
                     onClick={() => removeRow(r.assetClassId)}
-                    className="ml-2 text-sm text-red-600 hover:underline"
-                  >
-                    Remove
-                  </button>
+                    label="Remove target"
+                  />
                 </div>
               </li>
             );

@@ -1,12 +1,12 @@
 "use client";
 
 import { type HoldingInput, replaceHoldings } from "@allocado/app/_actions/holdings";
-import { DestructiveButton } from "@allocado/components/ui/buttons/DestructiveButton";
+import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton";
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
 import { SubmitButton } from "@allocado/components/ui/buttons/SubmitButton";
-import { useToast } from "@allocado/components/ui/Toast";
 import { formatUSD } from "@allocado/lib/money";
 import { useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
 
 type Asset = { id: string; ticker: string; name: string };
 type Holding = {
@@ -66,7 +66,6 @@ export function HoldingsEditor({
   const initial = useMemo(() => rowsFromHoldings(holdings), [holdings]);
   const [rows, setRows] = useState<Row[]>(initial);
   const [isPending, startTransition] = useTransition();
-  const toast = useToast();
 
   const total = rows.reduce((acc, r) => {
     const n = Number(r.value);
@@ -105,11 +104,11 @@ export function HoldingsEditor({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (rows.some((r) => !r.assetId)) {
-      toast.show("Choose an asset for every row", "error");
+      toast.error("Choose an asset for every row");
       return;
     }
     if (rows.some((r) => r.value.trim() === "")) {
-      toast.show("Every row needs a value", "error");
+      toast.error("Every row needs a value");
       return;
     }
     const items: HoldingInput[] = rows.map((r) => ({
@@ -119,8 +118,8 @@ export function HoldingsEditor({
     }));
     startTransition(async () => {
       const res = await replaceHoldings(accountId, items);
-      if (res.ok) toast.show("Saved.");
-      else toast.show(res.error, "error");
+      if (res.ok) toast.success("Saved.");
+      else toast.error(res.error);
     });
   }
 
@@ -200,9 +199,7 @@ export function HoldingsEditor({
                     className="input-field"
                   />
                 </div>
-                <DestructiveButton type="button" onClick={() => removeRow(row.key)}>
-                  Remove
-                </DestructiveButton>
+                <RemoveRowButton onClick={() => removeRow(row.key)} label="Remove holding" />
               </li>
             );
           })}

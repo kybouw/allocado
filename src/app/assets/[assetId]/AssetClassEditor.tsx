@@ -1,6 +1,7 @@
 "use client";
 
 import { setAssetAllocations } from "@allocado/app/_actions/assets";
+import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton";
 import { useMemo, useState, useTransition } from "react";
 
 type AssetClass = { id: string; name: string; type: "stock" | "bond" | "cash" | "other" };
@@ -72,13 +73,7 @@ export function AssetClassEditor({
                     className="input-field w-20 text-right"
                   />
                   <span className="text-sm text-avocado-600">%</span>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(r.assetClassId)}
-                    className="ml-1 text-xs text-red-500 hover:underline"
-                  >
-                    Remove
-                  </button>
+                  <RemoveRowButton onClick={() => removeRow(r.assetClassId)} label="Remove class" />
                 </div>
               </li>
             );

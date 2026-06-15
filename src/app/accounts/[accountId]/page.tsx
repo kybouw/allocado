@@ -55,6 +55,7 @@ export default async function AccountDetailPage({
             action={deleteAccount.bind(null, accountId)}
             redirectPath="/accounts"
             itemLabel="account"
+            itemName={account.name}
           />
         </div>
       </header>

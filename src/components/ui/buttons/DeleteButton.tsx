@@ -11,6 +11,7 @@ import {
   AlertDialogTrigger,
 } from "@allocado/components/ui/alert-dialog";
 import { Button } from "@allocado/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@allocado/components/ui/tooltip";
 import { Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -20,9 +21,10 @@ interface DeleteButtonProps {
   action: () => Promise<{ ok: boolean; error?: string }>;
   redirectPath: string;
   itemLabel: string;
+  itemName: string;
 }
 
-export function DeleteButton({ action, redirectPath, itemLabel }: DeleteButtonProps) {
+export function DeleteButton({ action, redirectPath, itemLabel, itemName }: DeleteButtonProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -32,7 +34,9 @@ export function DeleteButton({ action, redirectPath, itemLabel }: DeleteButtonPr
       const res = await action();
       setOpen(false);
       if (res.ok) {
-        toast.success("Deleted.");
+        toast.success(
+          `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} "${itemName}" has been deleted.`,
+        );
         router.push(redirectPath);
       } else {
         toast.error(res.error ?? "Delete failed.");
@@ -47,11 +51,16 @@ export function DeleteButton({ action, redirectPath, itemLabel }: DeleteButtonPr
         if (!isPending) setOpen(v);
       }}
     >
-      <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="icon" aria-label={`Delete ${itemLabel}`}>
-          <Trash2 className="size-4" />
-        </Button>
-      </AlertDialogTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="icon" aria-label={`Delete ${itemLabel}`}>
+              <Trash2 className="size-4" />
+            </Button>
+          </AlertDialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Delete {itemLabel}</TooltipContent>
+      </Tooltip>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {itemLabel}?</AlertDialogTitle>

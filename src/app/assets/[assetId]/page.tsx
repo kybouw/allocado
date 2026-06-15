@@ -73,6 +73,7 @@ export default async function AssetDetailPage({
               action={deleteAsset.bind(null, assetId)}
               redirectPath="/assets"
               itemLabel="asset"
+              itemName={first.ticker}
             />
           )}
         </div>

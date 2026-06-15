@@ -59,6 +59,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             action={deleteGoal.bind(null, goalId)}
             redirectPath="/goals"
             itemLabel="goal"
+            itemName={goal.name}
           />
         </div>
       </header>

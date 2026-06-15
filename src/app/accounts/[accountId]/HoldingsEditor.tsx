@@ -1,7 +1,7 @@
 "use client";
 
 import { type HoldingInput, replaceHoldings } from "@allocado/app/_actions/holdings";
-import { Button } from "@allocado/components/ui/button";
+import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton";
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
 import { SubmitButton } from "@allocado/components/ui/buttons/SubmitButton";
 import { formatUSD } from "@allocado/lib/money";
@@ -199,14 +199,7 @@ export function HoldingsEditor({
                     className="input-field"
                   />
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  type="button"
-                  onClick={() => removeRow(row.key)}
-                >
-                  Remove
-                </Button>
+                <RemoveRowButton onClick={() => removeRow(row.key)} label="Remove holding" />
               </li>
             );
           })}

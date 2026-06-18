@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, max } from "drizzle-orm";
 import { db } from "../index";
 import { accounts, goals } from "../schema";
 
@@ -17,7 +17,7 @@ export async function listAccounts(userId: string) {
     .from(accounts)
     .leftJoin(goals, eq(accounts.goalId, goals.id))
     .where(eq(accounts.userId, userId))
-    .orderBy(asc(accounts.createdAt));
+    .orderBy(asc(accounts.sortOrder), asc(accounts.createdAt));
 }
 
 export async function listAccountsForGoal(userId: string, goalId: string) {
@@ -25,7 +25,15 @@ export async function listAccountsForGoal(userId: string, goalId: string) {
     .select()
     .from(accounts)
     .where(and(eq(accounts.userId, userId), eq(accounts.goalId, goalId)))
-    .orderBy(asc(accounts.createdAt));
+    .orderBy(asc(accounts.sortOrder), asc(accounts.createdAt));
+}
+
+export async function maxAccountSortOrder(userId: string): Promise<number> {
+  const [{ val }] = await db
+    .select({ val: max(accounts.sortOrder) })
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+  return val ?? -1;
 }
 
 export async function getAccount(userId: string, accountId: string) {

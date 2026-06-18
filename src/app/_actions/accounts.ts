@@ -2,6 +2,7 @@
 
 import { db } from "@allocado/db";
 import { requireUserId } from "@allocado/db/auth";
+import { maxAccountSortOrder } from "@allocado/db/queries/accounts";
 import { accounts, goals } from "@allocado/db/schema";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -31,9 +32,11 @@ export async function createAccount(formData: FormData): Promise<ActionResult<{ 
       .limit(1);
     if (!goal[0]) return { ok: false, error: "Goal not found" };
 
+    const sortOrder = (await maxAccountSortOrder(userId)) + 1;
+
     const [row] = await db
       .insert(accounts)
-      .values({ userId, goalId, name, institution, accountType, notes })
+      .values({ userId, goalId, name, institution, accountType, notes, sortOrder })
       .returning({ id: accounts.id });
 
     revalidatePath("/accounts");
@@ -75,6 +78,25 @@ export async function deleteAccount(accountId: string): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
     await db.delete(accounts).where(and(eq(accounts.userId, userId), eq(accounts.id, accountId)));
+    revalidatePath("/accounts");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function reorderAccounts(orderedIds: string[]): Promise<ActionResult> {
+  try {
+    const userId = await requireUserId();
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx
+          .update(accounts)
+          .set({ sortOrder: i })
+          .where(and(eq(accounts.id, orderedIds[i]), eq(accounts.userId, userId)));
+      }
+    });
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
     return { ok: true };

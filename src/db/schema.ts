@@ -50,6 +50,7 @@ export const accounts = pgTable(
     institution: text("institution"),
     accountType: accountTypeEnum("account_type").notNull(),
     notes: text("notes"),
+    sortOrder: integer("sort_order").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("accounts_user_id_idx").on(t.userId), index("accounts_goal_id_idx").on(t.goalId)],

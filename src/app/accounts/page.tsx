@@ -3,6 +3,7 @@ import { requireUserId } from "@allocado/db/auth";
 import { listAccounts } from "@allocado/db/queries/accounts";
 import { listGoals } from "@allocado/db/queries/goals";
 import Link from "next/link";
+import { AccountsList } from "./AccountsList";
 
 const ACCOUNT_TYPES = [
   { value: "taxable", label: "Taxable brokerage" },
@@ -28,35 +29,7 @@ export default async function AccountsPage() {
 
       <section className="card flex flex-col gap-4">
         <h2 className="text-lg font-medium text-avocado-800">Your accounts</h2>
-        {accounts.length === 0 ? (
-          <p className="text-sm text-avocado-700">No accounts yet.</p>
-        ) : (
-          <ul className="divide-y divide-avocado-100">
-            {accounts.map((a) => (
-              <li key={a.id} className="flex items-center justify-between py-3">
-                <div>
-                  <Link
-                    href={`/accounts/${a.id}`}
-                    className="font-medium text-avocado-900 hover:underline"
-                  >
-                    {a.name}
-                  </Link>
-                  <span className="ml-3 text-xs text-avocado-600">{a.accountType}</span>
-                  {a.institution && (
-                    <span className="ml-2 text-xs text-avocado-600">· {a.institution}</span>
-                  )}
-                  <p className="mt-1 text-xs text-avocado-600">Goal: {a.goalName ?? "(none)"}</p>
-                </div>
-                <Link
-                  href={`/accounts/${a.id}`}
-                  className="text-sm font-medium text-avocado-700 hover:text-avocado-900"
-                >
-                  Holdings →
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AccountsList accounts={accounts} />
       </section>
 
       <section className="card flex flex-col gap-4">

@@ -1,34 +1,31 @@
 import { Card, CardContent, CardHeader } from "@allocado/components/ui/card";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccounts } from "@allocado/db/queries/accounts";
-import {
-  listAssetClassAllocationsForUser,
-  listAssetClassesForUser,
-  listAssetsForUser,
-} from "@allocado/db/queries/assets";
+import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForGoal } from "@allocado/db/queries/holdings";
 import { listTargetsForGoal } from "@allocado/db/queries/targets";
 import {
-  computeClassDollars,
-  computeClassFractions,
   computeGoalTotal,
+  computeTypeDollars,
+  computeTypeFractions,
   computeWeightedBondDuration,
   resolveActiveTargets,
 } from "@allocado/lib/allocation";
 import { formatPercent, formatUSD } from "@allocado/lib/money";
 import Link from "next/link";
 
-// Targeted categories: have goal-level targets and show drift
-const TARGETED = ["Stocks", "Bonds", "Cash"] as const;
-type TargetedName = (typeof TARGETED)[number];
+type TypeName = "Stocks" | "Bonds" | "Cash" | "Other";
+type TypeKey = "stock" | "bond" | "cash" | "other";
+const ALL_TYPE_KEYS = ["stock", "bond", "cash", "other"] as const satisfies TypeKey[];
+const TYPE_DISPLAY: Record<TypeKey, TypeName> = {
+  stock: "Stocks",
+  bond: "Bonds",
+  cash: "Cash",
+  other: "Other",
+};
 
-// Informational category: never has a target, only shown when current > 0
-const OTHER_NAME = "Other" as const;
-
-type AggregateName = TargetedName | typeof OTHER_NAME;
-
-const COLORS: Record<AggregateName, string> = {
+const COLORS: Record<TypeName, string> = {
   Stocks: "bg-avocado-500",
   Bonds: "bg-coin",
   Cash: "bg-avocado-200",
@@ -38,24 +35,11 @@ const COLORS: Record<AggregateName, string> = {
 export default async function DashboardPage() {
   const userId = await requireUserId();
 
-  const [goals, accounts, assetClasses, classAllocs, assets] = await Promise.all([
+  const [goals, accounts, assets] = await Promise.all([
     listGoals(userId),
     listAccounts(userId),
-    listAssetClassesForUser(userId),
-    listAssetClassAllocationsForUser(userId),
     listAssetsForUser(userId),
   ]);
-
-  // Map aggregate class names → IDs
-  const aggregateIds = new Map<AggregateName, string>(
-    ([...TARGETED, OTHER_NAME] as AggregateName[]).map((name) => {
-      const cls = assetClasses.find((c) => c.name === name);
-      return [name, cls?.id ?? ""];
-    }),
-  );
-
-  const aggregateIdSet = new Set(aggregateIds.values());
-  const aggregateAllocs = classAllocs.filter((a) => aggregateIdSet.has(a.assetClassId));
 
   const goalCards = await Promise.all(
     goals.map(async (g) => {
@@ -65,17 +49,15 @@ export default async function DashboardPage() {
       ]);
 
       const total = computeGoalTotal(holdings);
-      const classDollars = computeClassDollars(holdings, aggregateAllocs);
-      const current = computeClassFractions(classDollars, total);
+      const typeDollars = computeTypeDollars(holdings, assets);
+      const current = computeTypeFractions(typeDollars, total);
       const activeTargets = resolveActiveTargets(targets);
 
-      const targeted = TARGETED.map((name) => {
-        const id = aggregateIds.get(name) ?? "";
-        return { name, current: current.get(id) ?? 0, target: activeTargets.get(id) ?? 0 };
-      });
-
-      const otherId = aggregateIds.get(OTHER_NAME) ?? "";
-      const otherCurrent = current.get(otherId) ?? 0;
+      const targeted = ALL_TYPE_KEYS.map((key) => ({
+        name: TYPE_DISPLAY[key],
+        current: current.get(key) ?? 0,
+        target: activeTargets[key],
+      }));
 
       const duration = computeWeightedBondDuration(holdings, assets);
       const goalAccts = accounts.filter((a) => a.goalId === g.id);
@@ -87,7 +69,6 @@ export default async function DashboardPage() {
         list.push(h);
         holdingsByAccount.set(h.accountId, list);
       }
-
       const fundedAccounts = goalAccts.filter((a) => holdingsByAccount.has(a.id));
 
       const accountBreakdowns: AccountBreakdown[] =
@@ -95,23 +76,19 @@ export default async function DashboardPage() {
           ? fundedAccounts.map((acct) => {
               const acctHoldings = holdingsByAccount.get(acct.id) ?? [];
               const acctTotal = computeGoalTotal(acctHoldings);
-              const acctDollars = computeClassDollars(acctHoldings, aggregateAllocs);
-              const acctCurrent = computeClassFractions(acctDollars, acctTotal);
-              const acctTargeted = TARGETED.map((name) => {
-                const id = aggregateIds.get(name) ?? "";
-                return {
-                  name,
-                  current: acctCurrent.get(id) ?? 0,
-                  target: activeTargets.get(id) ?? 0,
-                };
-              });
+              const acctDollars = computeTypeDollars(acctHoldings, assets);
+              const acctCurrent = computeTypeFractions(acctDollars, acctTotal);
+              const acctTargeted = ALL_TYPE_KEYS.map((key) => ({
+                name: TYPE_DISPLAY[key],
+                current: acctCurrent.get(key) ?? 0,
+                target: activeTargets[key],
+              }));
               return {
                 accountId: acct.id,
                 accountName: acct.name,
                 accountType: acct.accountType,
                 total: acctTotal,
                 targeted: acctTargeted,
-                otherCurrent: acctCurrent.get(otherId) ?? 0,
               };
             })
           : [];
@@ -119,10 +96,9 @@ export default async function DashboardPage() {
       return {
         goal: g,
         total,
-        classDollars,
+        typeDollars,
         holdings,
         targeted,
-        otherCurrent,
         duration,
         accountCount,
         accountBreakdowns,
@@ -133,24 +109,24 @@ export default async function DashboardPage() {
 
   const portfolioTotal = goalCards.reduce((acc, c) => acc + Number(c.total), 0);
 
-  // Aggregate allocation across all goals
-  const totalClassDollars = new Map<string, number>();
+  const totalTypeDollars = new Map<TypeKey, number>([
+    ["stock", 0],
+    ["bond", 0],
+    ["cash", 0],
+    ["other", 0],
+  ]);
   for (const card of goalCards) {
-    for (const [classId, dollars] of card.classDollars) {
-      totalClassDollars.set(classId, (totalClassDollars.get(classId) ?? 0) + dollars);
+    for (const [type, dollars] of card.typeDollars) {
+      totalTypeDollars.set(type as TypeKey, (totalTypeDollars.get(type as TypeKey) ?? 0) + dollars);
     }
   }
-  const portfolioFractions = computeClassFractions(totalClassDollars, String(portfolioTotal));
-  const otherId = aggregateIds.get(OTHER_NAME) ?? "";
-  const portfolioTargeted = TARGETED.map((name) => {
-    const id = aggregateIds.get(name) ?? "";
-    return { name, current: portfolioFractions.get(id) ?? 0 };
-  });
-  const portfolioOtherCurrent = portfolioFractions.get(otherId) ?? 0;
-  const portfolioHasAllocation =
-    portfolioTargeted.some((b) => b.current > 0) || portfolioOtherCurrent > 0.001;
+  const portfolioFractions = computeTypeFractions(totalTypeDollars, String(portfolioTotal));
+  const portfolioTargeted = ALL_TYPE_KEYS.map((key) => ({
+    name: TYPE_DISPLAY[key],
+    current: portfolioFractions.get(key) ?? 0,
+  }));
+  const portfolioHasAllocation = portfolioTargeted.some((b) => b.current > 0);
 
-  // Portfolio-wide weighted average bond duration
   const allHoldings = goalCards.flatMap((c) => c.holdings);
   const portfolioDuration = computeWeightedBondDuration(allHoldings, assets);
 
@@ -184,26 +160,12 @@ export default async function DashboardPage() {
             </p>
           )}
         </div>
-        {portfolioHasAllocation && (
-          <PortfolioAllocationBars
-            targeted={portfolioTargeted}
-            otherCurrent={portfolioOtherCurrent}
-          />
-        )}
+        {portfolioHasAllocation && <PortfolioAllocationBars targeted={portfolioTargeted} />}
       </header>
 
       <div className="flex flex-col gap-6">
         {goalCards.map(
-          ({
-            goal,
-            total,
-            targeted,
-            otherCurrent,
-            duration,
-            accountCount,
-            accountBreakdowns,
-            hasHoldings,
-          }) => {
+          ({ goal, total, targeted, duration, accountCount, accountBreakdowns, hasHoldings }) => {
             const hasTargets = targeted.some((b) => b.target > 0);
 
             return (
@@ -250,7 +212,6 @@ export default async function DashboardPage() {
                     <>
                       <AllocationBars
                         targeted={targeted}
-                        otherCurrent={otherCurrent}
                         hasTargets={hasTargets}
                         goalId={goal.id}
                       />
@@ -269,16 +230,15 @@ export default async function DashboardPage() {
   );
 }
 
-type TargetedSlice = { name: TargetedName; current: number; target: number };
-type PortfolioSlice = { name: TargetedName; current: number };
+type AllocationSlice = { name: TypeName; current: number; target: number };
+type PortfolioSlice = { name: TypeName; current: number };
 
 type AccountBreakdown = {
   accountId: string;
   accountName: string;
   accountType: string;
   total: string;
-  targeted: TargetedSlice[];
-  otherCurrent: number;
+  targeted: AllocationSlice[];
 };
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
@@ -292,20 +252,8 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 
 const ROW_H = "h-9";
 
-function PortfolioAllocationBars({
-  targeted,
-  otherCurrent,
-}: {
-  targeted: PortfolioSlice[];
-  otherCurrent: number;
-}) {
-  const showOther = otherCurrent > 0.001;
-
-  const slices: Array<{ name: AggregateName; pct: number }> = [
-    ...targeted.map((b) => ({ name: b.name as AggregateName, pct: b.current })),
-    ...(showOther ? [{ name: OTHER_NAME as AggregateName, pct: otherCurrent }] : []),
-  ];
-
+function PortfolioAllocationBars({ targeted }: { targeted: PortfolioSlice[] }) {
+  const slices = targeted.map((b) => ({ name: b.name, pct: b.current }));
   const legendItems = slices.filter((s) => s.pct > 0.001);
 
   return (
@@ -327,44 +275,30 @@ function PortfolioAllocationBars({
 
 function AllocationBars({
   targeted,
-  otherCurrent,
   hasTargets,
   goalId,
 }: {
-  targeted: TargetedSlice[];
-  otherCurrent: number;
+  targeted: AllocationSlice[];
   hasTargets: boolean;
   goalId: string;
 }) {
-  const showOther = otherCurrent > 0.001;
-
-  // Current bar includes Other if present
-  const currentSlices: Array<{ name: AggregateName; pct: number }> = [
-    ...targeted.map((b) => ({ name: b.name as AggregateName, pct: b.current })),
-    ...(showOther ? [{ name: OTHER_NAME as AggregateName, pct: otherCurrent }] : []),
-  ];
-
-  // Target bar is targeted-only (Other target is always 0)
-  const targetSlices = targeted.map((b) => ({
-    name: b.name as AggregateName,
-    pct: b.target,
-  }));
-
-  // Extra column when Other is present
+  const other = targeted.find((b) => b.name === "Other");
+  const showOther = (other?.current ?? 0) > 0.001 || (other?.target ?? 0) > 0.001;
+  const visibleSlices = showOther ? targeted : targeted.filter((b) => b.name !== "Other");
   const colClass = showOther ? "grid-cols-4" : "grid-cols-3";
   const tableWidth = showOther ? "w-64" : "w-52";
 
+  const currentSlices = visibleSlices.map((b) => ({ name: b.name, pct: b.current }));
+  const targetSlices = visibleSlices.map((b) => ({ name: b.name, pct: b.target }));
+
   return (
     <div className="flex items-start gap-6">
-      {/* ── Left: labeled bars ───────────────────────────────────────── */}
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 h-5" />
-
         <div className={`${ROW_H} flex items-center gap-3`}>
           <span className="w-14 shrink-0 text-xs text-avocado-500">Current</span>
           <StackedBar slices={currentSlices} />
         </div>
-
         {hasTargets ? (
           <div className={`${ROW_H} flex items-center gap-3`}>
             <span className="w-14 shrink-0 text-xs text-avocado-500">Target</span>
@@ -378,7 +312,6 @@ function AllocationBars({
             </Link>
           </div>
         )}
-
         {hasTargets && (
           <div className={`${ROW_H} flex items-center gap-3`}>
             <span className="w-14 shrink-0 text-xs text-avocado-500">Drift</span>
@@ -386,44 +319,40 @@ function AllocationBars({
         )}
       </div>
 
-      {/* ── Right: numbers table ─────────────────────────────────────── */}
       <div className={`${tableWidth} shrink-0`}>
-        {/* Column headers */}
         <div className={`mb-0.5 grid h-5 ${colClass} items-end text-center`}>
-          {targeted.map((b) => (
-            <span key={b.name} className="text-xs font-medium text-avocado-600">
+          {visibleSlices.map((b) => (
+            <span
+              key={b.name}
+              className={`text-xs font-medium ${b.name === "Other" ? "text-purple-500" : "text-avocado-600"}`}
+            >
               {b.name}
             </span>
           ))}
-          {showOther && <span className="text-xs font-medium text-purple-500">Other</span>}
         </div>
 
-        {/* Current */}
         <div className={`${ROW_H} grid ${colClass} items-center text-center text-sm`}>
-          {targeted.map((b) => (
-            <span key={b.name} className="font-medium text-avocado-900">
+          {visibleSlices.map((b) => (
+            <span
+              key={b.name}
+              className={`font-medium ${b.name === "Other" ? "text-purple-700" : "text-avocado-900"}`}
+            >
               {formatPercent(b.current)}
             </span>
           ))}
-          {showOther && (
-            <span className="font-medium text-purple-700">{formatPercent(otherCurrent)}</span>
-          )}
         </div>
 
-        {/* Target */}
         <div className={`${ROW_H} grid ${colClass} items-center text-center text-sm`}>
-          {targeted.map((b) => (
+          {visibleSlices.map((b) => (
             <span key={b.name} className="text-avocado-600">
               {hasTargets ? formatPercent(b.target) : "—"}
             </span>
           ))}
-          {showOther && <span className="text-avocado-400">—</span>}
         </div>
 
-        {/* Drift */}
         {hasTargets && (
           <div className={`${ROW_H} grid ${colClass} items-center text-center text-sm`}>
-            {targeted.map((b) => {
+            {visibleSlices.map((b) => {
               const drift = b.current - b.target;
               return (
                 <span
@@ -441,7 +370,6 @@ function AllocationBars({
                 </span>
               );
             })}
-            {showOther && <span className="text-avocado-400">—</span>}
           </div>
         )}
       </div>
@@ -453,7 +381,7 @@ function StackedBar({
   slices,
   muted = false,
 }: {
-  slices: Array<{ name: AggregateName; pct: number }>;
+  slices: Array<{ name: TypeName; pct: number }>;
   muted?: boolean;
 }) {
   const total = slices.reduce((s, sl) => s + sl.pct, 0);
@@ -476,9 +404,14 @@ function StackedBar({
 }
 
 function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown[] }) {
-  const showOther = accounts.some((a) => a.otherCurrent > 0.001);
+  const showOther = accounts.some((a) =>
+    a.targeted.find((b) => b.name === "Other" && b.current > 0.001),
+  );
   const colClass = showOther ? "grid-cols-4" : "grid-cols-3";
   const tableWidth = showOther ? "w-64" : "w-52";
+  const headerNames = showOther
+    ? (["Stocks", "Bonds", "Cash", "Other"] as TypeName[])
+    : (["Stocks", "Bonds", "Cash"] as TypeName[]);
 
   return (
     <details className="group mt-1">
@@ -492,24 +425,24 @@ function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown[] }) {
           <div className="min-w-0 flex-1" />
           <div className={`${tableWidth} shrink-0`}>
             <div className={`grid ${colClass} text-center`}>
-              {TARGETED.map((name) => (
-                <span key={name} className="text-xs font-medium text-avocado-600">
+              {headerNames.map((name) => (
+                <span
+                  key={name}
+                  className={`text-xs font-medium ${name === "Other" ? "text-purple-500" : "text-avocado-600"}`}
+                >
                   {name}
                 </span>
               ))}
-              {showOther && <span className="text-xs font-medium text-purple-500">Other</span>}
             </div>
           </div>
         </div>
 
         {accounts.map((acct) => {
           const isTaxAdvantaged = ["ira", "roth_ira", "401k", "hsa"].includes(acct.accountType);
-          const currentSlices: Array<{ name: AggregateName; pct: number }> = [
-            ...acct.targeted.map((b) => ({ name: b.name as AggregateName, pct: b.current })),
-            ...(showOther && acct.otherCurrent > 0.001
-              ? [{ name: OTHER_NAME as AggregateName, pct: acct.otherCurrent }]
-              : []),
-          ];
+          const visibleSlices = showOther
+            ? acct.targeted
+            : acct.targeted.filter((b) => b.name !== "Other");
+          const currentSlices = visibleSlices.map((b) => ({ name: b.name, pct: b.current }));
 
           return (
             <div key={acct.accountId} className="flex items-center gap-6 py-2">
@@ -537,17 +470,14 @@ function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown[] }) {
 
               <div className={`${tableWidth} shrink-0`}>
                 <div className={`grid ${colClass} items-center text-center text-xs`}>
-                  {acct.targeted.map((b) => (
-                    <span key={b.name} className="text-avocado-800">
-                      {formatPercent(b.current)}
+                  {visibleSlices.map((b) => (
+                    <span
+                      key={b.name}
+                      className={b.name === "Other" ? "text-purple-600" : "text-avocado-800"}
+                    >
+                      {b.current > 0.001 ? formatPercent(b.current) : "—"}
                     </span>
                   ))}
-                  {showOther &&
-                    (acct.otherCurrent > 0.001 ? (
-                      <span className="text-purple-600">{formatPercent(acct.otherCurrent)}</span>
-                    ) : (
-                      <span className="text-avocado-300">—</span>
-                    ))}
                 </div>
               </div>
             </div>

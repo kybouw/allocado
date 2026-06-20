@@ -18,44 +18,39 @@ async function assertGoalOwned(userId: string, goalId: string) {
 }
 
 export type TargetInput = {
-  assetClassId: string;
-  targetPct: number;
+  stockTargetPct: number;
+  bondTargetPct: number;
+  cashTargetPct: number;
+  otherTargetPct: number;
   effectiveDate: string | null;
 };
 
 /**
- * Replace all static (effectiveDate = null) targets for a goal with the given set.
- * This is the most common case for MVP — glide-path dated rows are managed separately.
+ * Replace the static (effectiveDate = null) target for a goal with the given values.
  */
-export async function setStaticTargets(
-  goalId: string,
-  inputs: TargetInput[],
-): Promise<ActionResult> {
+export async function setStaticTargets(goalId: string, input: TargetInput): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
     await assertGoalOwned(userId, goalId);
 
-    for (const t of inputs) {
-      if (!(t.targetPct >= 0 && t.targetPct <= 100)) {
-        return { ok: false, error: `Target ${t.targetPct} out of range 0–100` };
-      }
+    const sum =
+      input.stockTargetPct + input.bondTargetPct + input.cashTargetPct + input.otherTargetPct;
+    if (Math.round(sum * 100) !== 10000) {
+      return { ok: false, error: `Targets must sum to 100% (got ${sum.toFixed(2)}%)` };
     }
 
-    // Use neon-serverless WebSocket transaction to make the replace atomic.
     await db.transaction(async (tx) => {
       await tx
         .delete(allocationTargets)
         .where(and(eq(allocationTargets.goalId, goalId), isNull(allocationTargets.effectiveDate)));
-      if (inputs.length > 0) {
-        await tx.insert(allocationTargets).values(
-          inputs.map((t) => ({
-            goalId,
-            assetClassId: t.assetClassId,
-            targetPct: t.targetPct.toFixed(2),
-            effectiveDate: null,
-          })),
-        );
-      }
+      await tx.insert(allocationTargets).values({
+        goalId,
+        stockTargetPct: input.stockTargetPct.toFixed(2),
+        bondTargetPct: input.bondTargetPct.toFixed(2),
+        cashTargetPct: input.cashTargetPct.toFixed(2),
+        otherTargetPct: input.otherTargetPct.toFixed(2),
+        effectiveDate: null,
+      });
     });
 
     revalidatePath(`/goals/${goalId}`);

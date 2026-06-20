@@ -1,18 +1,17 @@
 import { eq } from "drizzle-orm";
 import { db } from "../index";
-import { allocationTargets, assetClasses } from "../schema";
+import { allocationTargets } from "../schema";
 
 export async function listTargetsForGoal(goalId: string) {
   return db
     .select({
       id: allocationTargets.id,
-      assetClassId: allocationTargets.assetClassId,
-      className: assetClasses.name,
-      classType: assetClasses.type,
-      targetPct: allocationTargets.targetPct,
+      stockTargetPct: allocationTargets.stockTargetPct,
+      bondTargetPct: allocationTargets.bondTargetPct,
+      cashTargetPct: allocationTargets.cashTargetPct,
+      otherTargetPct: allocationTargets.otherTargetPct,
       effectiveDate: allocationTargets.effectiveDate,
     })
     .from(allocationTargets)
-    .innerJoin(assetClasses, eq(allocationTargets.assetClassId, assetClasses.id))
     .where(eq(allocationTargets.goalId, goalId));
 }

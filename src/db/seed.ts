@@ -9,11 +9,6 @@ export const SYSTEM_CLASSES: Array<{
   type: AssetClassType;
   avgDurationYears?: string;
 }> = [
-  // ── Aggregate (goal targets + dashboard) ─────────────────────────────
-  { name: "Stocks", type: "stock" },
-  { name: "Bonds", type: "bond" },
-  { name: "Cash", type: "cash" },
-  { name: "Other", type: "other" },
   // ── Equity ───────────────────────────────────────────────────────────
   { name: "US Stocks", type: "stock" },
   { name: "Foreign Stocks", type: "stock" },
@@ -45,7 +40,11 @@ export type AssetSeed = {
   ticker: string;
   name: string;
   avgDurationYears?: string;
-  classes: Array<[string, string]>; // [className, ratio]
+  stockPct: string;
+  bondPct: string;
+  cashPct: string;
+  otherPct: string;
+  classes: Array<[string, string]>; // [subclassName, ratio]
 };
 
 // Generic index archetypes — no fund family or provider implied.
@@ -55,8 +54,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "SP500",
     name: "S&P 500 Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["US Stocks", "100"],
       ["Large-Cap", "100"],
     ],
@@ -64,8 +66,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "USMKT",
     name: "US Total Market Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["US Stocks", "100"],
       ["Large-Cap", "82"],
       ["Mid-Cap", "15"],
@@ -75,8 +80,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "USMID",
     name: "US Mid-Cap Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["US Stocks", "100"],
       ["Mid-Cap", "100"],
     ],
@@ -84,8 +92,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "USSML",
     name: "US Small-Cap Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["US Stocks", "100"],
       ["Small-Cap", "100"],
     ],
@@ -93,8 +104,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "INTL",
     name: "International Developed Markets Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["Foreign Stocks", "100"],
       ["Developed Markets", "100"],
     ],
@@ -102,8 +116,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "EM",
     name: "Emerging Markets Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["Foreign Stocks", "100"],
       ["Emerging Markets", "100"],
     ],
@@ -111,8 +128,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "WORLD",
     name: "Total World Stock Market Index",
+    stockPct: "100",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Stocks", "100"],
       ["US Stocks", "60"],
       ["Foreign Stocks", "40"],
       ["Developed Markets", "88"],
@@ -124,8 +144,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
     ticker: "USBND",
     name: "US Total Bond Market Index",
     avgDurationYears: "6.5",
+    stockPct: "0",
+    bondPct: "100",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Bonds", "100"],
       ["US Bonds", "100"],
       ["Intermediate-Term Bonds", "100"],
       ["Taxable Bonds", "100"],
@@ -135,8 +158,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
     ticker: "STSTRS",
     name: "US Short-Term Treasury Index",
     avgDurationYears: "2.0",
+    stockPct: "0",
+    bondPct: "100",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Bonds", "100"],
       ["US Bonds", "100"],
       ["Short-Term Bonds", "100"],
       ["Treasury Bonds", "100"],
@@ -146,8 +172,11 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
     ticker: "ITTRS",
     name: "US Intermediate-Term Treasury Index",
     avgDurationYears: "5.5",
+    stockPct: "0",
+    bondPct: "100",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Bonds", "100"],
       ["US Bonds", "100"],
       ["Intermediate-Term Bonds", "100"],
       ["Treasury Bonds", "100"],
@@ -158,21 +187,29 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
     ticker: "MMKT",
     name: "US Treasury Money Market",
     avgDurationYears: "0.1",
-    classes: [
-      ["Cash", "100"],
-      ["Money Market", "100"],
-    ],
+    stockPct: "0",
+    bondPct: "0",
+    cashPct: "100",
+    otherPct: "0",
+    classes: [["Money Market", "100"]],
   },
   {
     ticker: "CASH",
     name: "Cash",
-    classes: [["Cash", "100"]],
+    stockPct: "0",
+    bondPct: "0",
+    cashPct: "100",
+    otherPct: "0",
+    classes: [],
   },
   {
     ticker: "CD",
     name: "Brokered CD",
+    stockPct: "0",
+    bondPct: "100",
+    cashPct: "0",
+    otherPct: "0",
     classes: [
-      ["Bonds", "100"],
       ["US Bonds", "100"],
       ["Short-Term Bonds", "100"],
       ["CDs", "100"],
@@ -182,18 +219,20 @@ export const SYSTEM_ASSETS: AssetSeed[] = [
   {
     ticker: "CRYPTO",
     name: "Cryptocurrency (generic)",
-    classes: [
-      ["Other", "100"],
-      ["Crypto", "100"],
-    ],
+    stockPct: "0",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "100",
+    classes: [["Crypto", "100"]],
   },
   {
     ticker: "GOLD",
     name: "Gold (generic)",
-    classes: [
-      ["Other", "100"],
-      ["Gold", "100"],
-    ],
+    stockPct: "0",
+    bondPct: "0",
+    cashPct: "0",
+    otherPct: "100",
+    classes: [["Gold", "100"]],
   },
 ];
 
@@ -228,6 +267,10 @@ export async function seedAssets(
         ticker: a.ticker,
         name: a.name,
         avgDurationYears: a.avgDurationYears,
+        stockPct: a.stockPct,
+        bondPct: a.bondPct,
+        cashPct: a.cashPct,
+        otherPct: a.otherPct,
         userId,
       })
       .onConflictDoNothing()

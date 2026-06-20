@@ -1,19 +1,22 @@
 import { createAsset } from "@allocado/app/_actions/assets";
 import { requireUserId } from "@allocado/db/auth";
 import { listAssetsWithClasses } from "@allocado/db/queries/assets";
-import Link from "next/link";
+import { MyLibrarySection, SystemLibrarySection } from "./AssetsLibraryView";
 
 export default async function AssetsPage() {
   const userId = await requireUserId();
   const rows = await listAssetsWithClasses(userId);
 
-  // Group by asset, tracking ownership
   type AssetEntry = {
     id: string;
     isOwned: boolean;
     ticker: string;
     name: string;
     avgDurationYears: string | null;
+    stockPct: number;
+    bondPct: number;
+    cashPct: number;
+    otherPct: number;
     classes: Array<{ name: string; type: string; ratio: string }>;
   };
 
@@ -26,6 +29,10 @@ export default async function AssetsPage() {
       ticker: r.ticker,
       name: r.assetName,
       avgDurationYears: r.avgDurationYears,
+      stockPct: Number(r.stockPct ?? 0),
+      bondPct: Number(r.bondPct ?? 0),
+      cashPct: Number(r.cashPct ?? 0),
+      otherPct: Number(r.otherPct ?? 0),
       classes: [],
     };
     if (r.className && r.classType && r.ratio) {
@@ -50,12 +57,7 @@ export default async function AssetsPage() {
         </p>
       </header>
 
-      {userAssets.length > 0 && (
-        <section className="card flex flex-col gap-4">
-          <h2 className="text-lg font-medium text-avocado-800">My assets</h2>
-          <AssetTable assets={userAssets} editable />
-        </section>
-      )}
+      <MyLibrarySection userAssets={userAssets} />
 
       <section className="card flex flex-col gap-4">
         <h2 className="text-lg font-medium text-avocado-800">Add asset</h2>
@@ -104,7 +106,7 @@ export default async function AssetsPage() {
             <input name="notes" type="text" className="input-field" />
           </div>
           <div className="sm:col-span-2 text-xs text-avocado-600">
-            After creating, open the asset to assign its Stocks / Bonds / Cash classification.
+            After creating, open the asset to set its Stocks / Bonds / Cash / Other allocation.
           </div>
           <div className="sm:col-span-2">
             <button type="submit" className="btn-primary">
@@ -114,81 +116,7 @@ export default async function AssetsPage() {
         </form>
       </section>
 
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-lg font-medium text-avocado-800">System library</h2>
-        <AssetTable assets={systemAssets} editable={false} />
-      </section>
-    </div>
-  );
-}
-
-function AssetTable({
-  assets,
-  editable,
-}: {
-  assets: Array<{
-    id: string;
-    ticker: string;
-    name: string;
-    avgDurationYears: string | null;
-    classes: Array<{ name: string; type: string; ratio: string }>;
-  }>;
-  editable: boolean;
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-avocado-600">
-            <th className="pb-2 pr-4">Ticker</th>
-            <th className="pb-2 pr-4">Name</th>
-            <th className="pb-2 pr-4">Duration</th>
-            <th className="pb-2">Classes</th>
-            {editable && <th className="pb-2" />}
-          </tr>
-        </thead>
-        <tbody>
-          {assets.map((a) => (
-            <tr key={a.id} className="border-t border-avocado-100 align-top">
-              <td className="py-3 pr-4 font-mono font-medium text-avocado-900">
-                {editable ? (
-                  <Link href={`/assets/${a.id}`} className="hover:underline">
-                    {a.ticker}
-                  </Link>
-                ) : (
-                  a.ticker
-                )}
-              </td>
-              <td className="py-3 pr-4 text-avocado-800">{a.name}</td>
-              <td className="py-3 pr-4 text-avocado-600">
-                {a.avgDurationYears ? `${Number(a.avgDurationYears).toFixed(1)} yr` : "—"}
-              </td>
-              <td className="py-3">
-                <ul className="flex flex-wrap gap-1">
-                  {a.classes.map((c) => (
-                    <li
-                      key={`${a.id}-${c.name}`}
-                      className="rounded bg-avocado-100 px-2 py-0.5 text-xs text-avocado-800"
-                    >
-                      {c.name} {Number(c.ratio).toFixed(0)}%
-                    </li>
-                  ))}
-                </ul>
-              </td>
-              {editable && (
-                <td className="py-3 pl-4">
-                  <Link
-                    href={`/assets/${a.id}`}
-                    className="text-xs font-medium text-avocado-600 hover:text-avocado-900 hover:underline"
-                  >
-                    Edit →
-                  </Link>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SystemLibrarySection systemAssets={systemAssets} defaultOpen={userAssets.length === 0} />
     </div>
   );
 }

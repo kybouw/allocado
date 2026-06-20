@@ -31,6 +31,13 @@ export default async function AssetDetailPage({
   const first = rows[0];
   const isOwned = first.assetUserId === userId;
 
+  const initialTypePcts = {
+    stockPct: Number(first.stockPct ?? 0),
+    bondPct: Number(first.bondPct ?? 0),
+    cashPct: Number(first.cashPct ?? 0),
+    otherPct: Number(first.otherPct ?? 0),
+  };
+
   const seen = new Set<string>();
   const allocations: AllocationRow[] = [];
   for (const r of rows) {
@@ -141,14 +148,10 @@ export default async function AssetDetailPage({
 
           <section className="card flex flex-col gap-4">
             <h2 className="text-lg font-medium text-avocado-800">Asset class allocations</h2>
-            <p className="text-sm text-avocado-700">
-              Tag this asset with the classes it belongs to. Include <strong>Stocks</strong>,{" "}
-              <strong>Bonds</strong>, or <strong>Cash</strong> at the aggregate level so it rolls up
-              correctly on the dashboard.
-            </p>
             <AssetClassEditor
               assetId={assetId}
               allClasses={allClasses.map((c) => ({ id: c.id, name: c.name, type: c.type }))}
+              initialTypePcts={initialTypePcts}
               initialAllocations={allocations.map((a) => ({
                 assetClassId: a.classId,
                 ratio: Number(a.ratio),
@@ -157,22 +160,51 @@ export default async function AssetDetailPage({
           </section>
         </>
       ) : (
-        <section className="card">
-          <h2 className="mb-4 text-lg font-medium text-avocado-800">Asset class allocations</h2>
-          {allocations.length === 0 ? (
-            <p className="text-sm text-avocado-700">No class mappings.</p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {allocations.map((a) => (
-                <li
-                  key={a.classId}
-                  className="rounded bg-avocado-100 px-3 py-1 text-sm text-avocado-800"
-                >
-                  {a.className} {Number(a.ratio).toFixed(0)}%
-                </li>
-              ))}
-            </ul>
-          )}
+        <section className="card flex flex-col gap-4">
+          <h2 className="text-lg font-medium text-avocado-800">Asset class allocations</h2>
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-avocado-500">
+                Primary allocation
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { label: "Stocks", value: initialTypePcts.stockPct },
+                    { label: "Bonds", value: initialTypePcts.bondPct },
+                    { label: "Cash", value: initialTypePcts.cashPct },
+                    { label: "Other", value: initialTypePcts.otherPct },
+                  ] as const
+                )
+                  .filter((x) => x.value > 0)
+                  .map((x) => (
+                    <li
+                      key={x.label}
+                      className="rounded bg-avocado-100 px-3 py-1 text-sm text-avocado-800"
+                    >
+                      {x.label} {x.value.toFixed(0)}%
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            {allocations.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-avocado-500">
+                  Subclasses
+                </p>
+                <ul className="flex flex-wrap gap-2">
+                  {allocations.map((a) => (
+                    <li
+                      key={a.classId}
+                      className="rounded bg-avocado-100 px-3 py-1 text-sm text-avocado-800"
+                    >
+                      {a.className} {Number(a.ratio).toFixed(0)}%
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </section>
       )}
     </div>

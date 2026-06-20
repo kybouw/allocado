@@ -2,7 +2,6 @@ import { deleteGoal, updateGoal } from "@allocado/app/_actions/goals";
 import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccountsForGoal } from "@allocado/db/queries/accounts";
-import { listAssetClassesForUser } from "@allocado/db/queries/assets";
 import { getGoal } from "@allocado/db/queries/goals";
 import { listTargetsForGoal } from "@allocado/db/queries/targets";
 import Link from "next/link";
@@ -15,29 +14,18 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
   const goal = await getGoal(userId, goalId);
   if (!goal) notFound();
 
-  const [accountsInGoal, allClasses, targets] = await Promise.all([
+  const [accountsInGoal, targets] = await Promise.all([
     listAccountsForGoal(userId, goalId),
-    listAssetClassesForUser(userId),
     listTargetsForGoal(goalId),
   ]);
 
-  // Targets are set at the big-3 level only: Stocks, Bonds, Cash
-  const bigThreeOrder = ["Stocks", "Bonds", "Cash"];
-  const bigThreeClasses = bigThreeOrder
-    .map((name) => allClasses.find((c) => c.name === name))
-    .filter((c): c is NonNullable<typeof c> => c != null);
-
-  const existingTargets = new Map(
-    targets
-      .filter((t) => t.effectiveDate == null)
-      .map((t) => [t.assetClassId, Number(t.targetPct)]),
-  );
-
-  // Pre-populate all three rows (0% if not yet set) so the editor always shows all three
-  const prepopulatedTargets = bigThreeClasses.map((c) => ({
-    assetClassId: c.id,
-    targetPct: existingTargets.get(c.id) ?? 0,
-  }));
+  const staticTarget = targets.find((t) => t.effectiveDate == null);
+  const initialTargets = {
+    stockTargetPct: Number(staticTarget?.stockTargetPct ?? 0),
+    bondTargetPct: Number(staticTarget?.bondTargetPct ?? 0),
+    cashTargetPct: Number(staticTarget?.cashTargetPct ?? 0),
+    otherTargetPct: Number(staticTarget?.otherTargetPct ?? 0),
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -112,18 +100,9 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
       <section className="card flex flex-col gap-4">
         <h2 className="text-lg font-medium text-avocado-800">Allocation targets</h2>
         <p className="text-sm text-avocado-700">
-          Set your Stocks / Bonds / Cash target. Holdings are tagged with granular classes (US
-          Stocks, Short-Term Bonds, etc.) which roll up into these three automatically.
+          Set your Stocks / Bonds / Cash / Other target allocation. All four must sum to 100%.
         </p>
-        <TargetsEditor
-          goalId={goalId}
-          assetClasses={bigThreeClasses.map((c) => ({
-            id: c.id,
-            name: c.name,
-            type: c.type,
-          }))}
-          initialTargets={prepopulatedTargets}
-        />
+        <TargetsEditor goalId={goalId} initialTargets={initialTargets} />
       </section>
 
       <section className="card flex flex-col gap-4">

@@ -47,6 +47,7 @@ function PrimaryAllocationSection({
 
   const sum = stock + bond + cash + other;
   const sumOk = Math.round(sum * 100) === 10000;
+  const over = sum > 100.005;
 
   function save() {
     if (!sumOk) return;
@@ -98,11 +99,24 @@ function PrimaryAllocationSection({
         ))}
       </div>
 
-      <SumChip value={sum} ok={sumOk} />
-
       <div className="flex items-center gap-3">
-        <button type="button" onClick={save} disabled={isPending || !sumOk} className="btn-primary">
-          {isPending ? "Saving…" : "Save primary allocation"}
+        <button
+          type="button"
+          onClick={save}
+          disabled={isPending || !sumOk}
+          className={
+            sumOk
+              ? "btn-primary"
+              : "cursor-not-allowed rounded-md bg-gray-100 px-4 py-2 font-medium text-gray-400 transition"
+          }
+        >
+          {isPending
+            ? "Saving…"
+            : sumOk
+              ? "Save Allocation"
+              : over
+                ? `Total: ${sum.toFixed(1)}% — over 100%`
+                : `Total: ${sum.toFixed(1)}% — must equal 100%`}
         </button>
         {feedback && (
           <span
@@ -250,21 +264,3 @@ function SubclassSection({
   );
 }
 
-function SumChip({ value, ok }: { value: number; ok: boolean }) {
-  const over = value > 100.005;
-  return (
-    <div
-      className={`w-fit rounded border px-3 py-2 text-sm ${
-        ok
-          ? "border-avocado-300 bg-avocado-50"
-          : over
-            ? "border-red-300 bg-red-50"
-            : "border-avocado-100 bg-white"
-      }`}
-    >
-      <span className={ok ? "text-avocado-700" : over ? "text-red-700" : "text-avocado-600"}>
-        Total: {value.toFixed(1)}%{ok ? " ✓" : over ? " — over 100%" : " — must equal 100%"}
-      </span>
-    </div>
-  );
-}

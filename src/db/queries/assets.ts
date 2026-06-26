@@ -20,19 +20,6 @@ export async function listAssetClassesForUser(userId: string) {
     .orderBy(asc(assetClasses.type), asc(assetClasses.name));
 }
 
-/** Class mapping rows for all accessible assets. Needed for drift math. */
-export async function listAssetClassAllocationsForUser(userId: string) {
-  return db
-    .select({
-      assetId: assetClassAllocations.assetId,
-      assetClassId: assetClassAllocations.assetClassId,
-      ratio: assetClassAllocations.ratio,
-    })
-    .from(assetClassAllocations)
-    .innerJoin(assets, eq(assetClassAllocations.assetId, assets.id))
-    .where(or(isNull(assets.userId), eq(assets.userId, userId)));
-}
-
 export async function listAssetsWithClasses(userId: string) {
   const rows = await db
     .select({
@@ -41,6 +28,10 @@ export async function listAssetsWithClasses(userId: string) {
       ticker: assets.ticker,
       assetName: assets.name,
       avgDurationYears: assets.avgDurationYears,
+      stockPct: assets.stockPct,
+      bondPct: assets.bondPct,
+      cashPct: assets.cashPct,
+      otherPct: assets.otherPct,
       notes: assets.notes,
       classId: assetClasses.id,
       className: assetClasses.name,
@@ -63,6 +54,10 @@ export async function getAssetWithClasses(userId: string, assetId: string) {
       ticker: assets.ticker,
       assetName: assets.name,
       avgDurationYears: assets.avgDurationYears,
+      stockPct: assets.stockPct,
+      bondPct: assets.bondPct,
+      cashPct: assets.cashPct,
+      otherPct: assets.otherPct,
       notes: assets.notes,
       classAllocId: assetClassAllocations.id,
       classId: assetClasses.id,

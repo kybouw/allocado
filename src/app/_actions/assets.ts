@@ -23,7 +23,7 @@ export async function createAsset(formData: FormData): Promise<ActionResult<{ id
 
     const [row] = await db
       .insert(assets)
-      .values({ userId, ticker, name, avgDurationYears, notes })
+      .values({ userId, ticker, name, avgDurationYears, notes, otherPct: "100" })
       .returning({ id: assets.id });
 
     revalidatePath("/assets");
@@ -73,6 +73,38 @@ export async function deleteAsset(assetId: string): Promise<ActionResult> {
     if (msg.includes("foreign key") || msg.includes("violates"))
       return { ok: false, error: "Cannot delete — this asset is used in holdings" };
     return { ok: false, error: msg };
+  }
+}
+
+export async function updateAssetTypePcts(
+  assetId: string,
+  pcts: { stockPct: number; bondPct: number; cashPct: number; otherPct: number },
+): Promise<ActionResult> {
+  try {
+    const userId = await requireUserId();
+    const sum = pcts.stockPct + pcts.bondPct + pcts.cashPct + pcts.otherPct;
+    if (Math.round(sum * 100) !== 10000) {
+      return { ok: false, error: `Percentages must sum to 100% (got ${sum.toFixed(2)}%)` };
+    }
+
+    const updated = await db
+      .update(assets)
+      .set({
+        stockPct: pcts.stockPct.toFixed(2),
+        bondPct: pcts.bondPct.toFixed(2),
+        cashPct: pcts.cashPct.toFixed(2),
+        otherPct: pcts.otherPct.toFixed(2),
+      })
+      .where(and(eq(assets.id, assetId), eq(assets.userId, userId)))
+      .returning({ id: assets.id });
+
+    if (updated.length === 0) return { ok: false, error: "Asset not found" };
+
+    revalidatePath("/assets");
+    revalidatePath(`/assets/${assetId}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
   }
 }
 

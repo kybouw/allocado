@@ -80,10 +80,20 @@ export const assets = pgTable(
     price: numeric("price", { precision: 19, scale: 4 }),
     priceUpdatedAt: timestamp("price_updated_at"),
     avgDurationYears: numeric("avg_duration_years", { precision: 6, scale: 3 }),
+    stockPct: numeric("stock_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    bondPct: numeric("bond_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    cashPct: numeric("cash_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    otherPct: numeric("other_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [unique("assets_user_ticker_unique").on(t.userId, t.ticker).nullsNotDistinct()],
+  (t) => [
+    unique("assets_user_ticker_unique").on(t.userId, t.ticker).nullsNotDistinct(),
+    check(
+      "assets_type_pct_sum",
+      sql`${t.stockPct} + ${t.bondPct} + ${t.cashPct} + ${t.otherPct} = 100`,
+    ),
+  ],
 );
 
 export const assetClassAllocations = pgTable(
@@ -130,18 +140,19 @@ export const allocationTargets = pgTable(
     goalId: uuid("goal_id")
       .notNull()
       .references(() => goals.id, { onDelete: "cascade" }),
-    assetClassId: uuid("asset_class_id")
-      .notNull()
-      .references(() => assetClasses.id, { onDelete: "restrict" }),
-    targetPct: numeric("target_pct", { precision: 5, scale: 2 }).notNull(),
+    stockTargetPct: numeric("stock_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    bondTargetPct: numeric("bond_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    cashTargetPct: numeric("cash_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+    otherTargetPct: numeric("other_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     effectiveDate: date("effective_date"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
-    unique("targets_goal_class_date_unique")
-      .on(t.goalId, t.assetClassId, t.effectiveDate)
-      .nullsNotDistinct(),
-    check("targets_pct_range", sql`${t.targetPct} >= 0 AND ${t.targetPct} <= 100`),
+    unique("targets_goal_date_unique").on(t.goalId, t.effectiveDate).nullsNotDistinct(),
+    check(
+      "targets_type_pct_sum",
+      sql`${t.stockTargetPct} + ${t.bondTargetPct} + ${t.cashTargetPct} + ${t.otherTargetPct} = 100`,
+    ),
   ],
 );
 
@@ -162,7 +173,6 @@ export const assetsRelations = relations(assets, ({ many }) => ({
 
 export const assetClassesRelations = relations(assetClasses, ({ many }) => ({
   assetAllocations: many(assetClassAllocations),
-  targets: many(allocationTargets),
 }));
 
 export const assetClassAllocationsRelations = relations(assetClassAllocations, ({ one }) => ({
@@ -180,8 +190,4 @@ export const holdingsRelations = relations(holdings, ({ one }) => ({
 
 export const allocationTargetsRelations = relations(allocationTargets, ({ one }) => ({
   goal: one(goals, { fields: [allocationTargets.goalId], references: [goals.id] }),
-  assetClass: one(assetClasses, {
-    fields: [allocationTargets.assetClassId],
-    references: [assetClasses.id],
-  }),
 }));

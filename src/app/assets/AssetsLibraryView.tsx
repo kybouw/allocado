@@ -89,15 +89,11 @@ function AssetTabs({ assets, editable }: { assets: AssetEntry[]; editable: boole
   return (
     <Tabs defaultValue="stock">
       <TabsList>
-        {TABS.map(({ key, label }) => {
-          const count = assets.filter((a) => (a[PCT_KEY[key]] as number) > 0).length;
-          return (
-            <TabsTrigger key={key} value={key}>
-              {label}
-              {count > 0 && <span className="ml-1.5 text-xs text-muted-foreground">({count})</span>}
-            </TabsTrigger>
-          );
-        })}
+        {TABS.map(({ key, label }) => (
+          <TabsTrigger key={key} value={key}>
+            {label}
+          </TabsTrigger>
+        ))}
       </TabsList>
       {TABS.map(({ key }) => {
         const filtered = assets.filter((a) => (a[PCT_KEY[key]] as number) > 0);

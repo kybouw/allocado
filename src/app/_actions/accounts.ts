@@ -4,13 +4,11 @@ import { db } from "@allocado/db";
 import { requireUserId } from "@allocado/db/auth";
 import { maxAccountSortOrder } from "@allocado/db/queries/accounts";
 import { accounts, goals } from "@allocado/db/schema";
+import { ACCOUNT_TYPE_VALUES, type AccountType } from "@allocado/lib/account-types";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
-
-type AccountType = "taxable" | "ira" | "roth_ira" | "401k" | "hsa" | "other";
-const ACCOUNT_TYPES: AccountType[] = ["taxable", "ira", "roth_ira", "401k", "hsa", "other"];
 
 export async function createAccount(formData: FormData): Promise<ActionResult<{ id: string }>> {
   try {
@@ -23,7 +21,8 @@ export async function createAccount(formData: FormData): Promise<ActionResult<{ 
 
     if (!name) return { ok: false, error: "Name is required" };
     if (!goalId) return { ok: false, error: "Goal is required" };
-    if (!ACCOUNT_TYPES.includes(accountType)) return { ok: false, error: "Invalid account type" };
+    if (!ACCOUNT_TYPE_VALUES.includes(accountType))
+      return { ok: false, error: "Invalid account type" };
 
     const goal = await db
       .select({ id: goals.id })
@@ -58,7 +57,8 @@ export async function updateAccount(accountId: string, formData: FormData): Prom
     const notes = String(formData.get("notes") ?? "").trim() || null;
 
     if (!name) return { ok: false, error: "Name is required" };
-    if (!ACCOUNT_TYPES.includes(accountType)) return { ok: false, error: "Invalid account type" };
+    if (!ACCOUNT_TYPE_VALUES.includes(accountType))
+      return { ok: false, error: "Invalid account type" };
 
     await db
       .update(accounts)

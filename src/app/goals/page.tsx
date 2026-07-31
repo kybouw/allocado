@@ -1,74 +1,59 @@
-import { createGoal } from "@allocado/app/_actions/goals";
+import { reorderGoals } from "@allocado/app/_actions/goals";
+import { GoalAllocationCard } from "@allocado/components/allocation/GoalAllocationCard";
+import { GoalFormDialog } from "@allocado/components/goals/GoalFormDialog";
+import { SortableCardList } from "@allocado/components/SortableCardList";
 import { requireUserId } from "@allocado/db/auth";
-import { listGoals } from "@allocado/db/queries/goals";
-import { GoalsList } from "./GoalsList";
+import { buildGoalCards } from "@allocado/lib/goal-cards";
 
 export default async function GoalsPage() {
   const userId = await requireUserId();
-  const goals = await listGoals(userId);
+  const { goalCards } = await buildGoalCards(userId);
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-avocado-900">Goals</h1>
-        <p className="text-sm text-avocado-700">
-          Group your accounts under a savings goal to track allocation independently.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-avocado-900">Goals</h1>
+          <p className="text-sm text-avocado-700">
+            Group your accounts under a savings goal to track allocation independently.
+          </p>
+        </div>
+        <GoalFormDialog />
       </header>
 
-      <section className="card flex flex-col gap-6">
-        <h2 className="text-lg font-medium text-avocado-800">Your goals</h2>
-        <GoalsList
-          goals={goals.map((g) => ({
-            id: g.id,
-            name: g.name,
-            targetDate: g.targetDate,
-            notes: g.notes,
+      {goalCards.length === 0 ? (
+        <p className="text-sm text-avocado-700">
+          No goals yet. Create one with the + button above.
+        </p>
+      ) : (
+        <SortableCardList
+          onReorder={reorderGoals}
+          items={goalCards.map((card) => ({
+            id: card.goal.id,
+            node: (
+              <GoalAllocationCard
+                goal={card.goal}
+                total={card.total}
+                targeted={card.targeted}
+                duration={card.duration}
+                accountCount={card.accountCount}
+                accountBreakdowns={card.accountBreakdowns}
+                hasHoldings={card.hasHoldings}
+                actions={
+                  <GoalFormDialog
+                    goal={{
+                      id: card.goal.id,
+                      name: card.goal.name,
+                      targetDate: card.goal.targetDate,
+                      notes: card.goal.notes,
+                    }}
+                  />
+                }
+              />
+            ),
           }))}
         />
-      </section>
-
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-lg font-medium text-avocado-800">New goal</h2>
-        <form
-          action={async (formData) => {
-            "use server";
-            await createGoal(formData);
-          }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-        >
-          <div className="flex flex-col gap-1">
-            <label htmlFor="name" className="text-sm font-medium text-avocado-700">
-              Name
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              placeholder="Retirement"
-              className="input-field"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="targetDate" className="text-sm font-medium text-avocado-700">
-              Target date (optional)
-            </label>
-            <input id="targetDate" name="targetDate" type="date" className="input-field" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="notes" className="text-sm font-medium text-avocado-700">
-              Notes (optional)
-            </label>
-            <input id="notes" name="notes" type="text" className="input-field" />
-          </div>
-          <div className="sm:col-span-3">
-            <button type="submit" className="btn-primary">
-              Create goal
-            </button>
-          </div>
-        </form>
-      </section>
+      )}
     </div>
   );
 }

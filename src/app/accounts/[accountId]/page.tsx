@@ -5,18 +5,10 @@ import { getAccount } from "@allocado/db/queries/accounts";
 import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
+import { ACCOUNT_TYPES } from "@allocado/lib/account-types";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HoldingsEditor } from "./HoldingsEditor";
-
-const ACCOUNT_TYPES = [
-  { value: "taxable", label: "Taxable brokerage" },
-  { value: "ira", label: "Traditional IRA" },
-  { value: "roth_ira", label: "Roth IRA" },
-  { value: "401k", label: "401(k)" },
-  { value: "hsa", label: "HSA" },
-  { value: "other", label: "Other" },
-];
 
 export default async function AccountDetailPage({
   params,

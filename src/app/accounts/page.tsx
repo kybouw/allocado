@@ -1,106 +1,81 @@
-import { createAccount } from "@allocado/app/_actions/accounts";
+import { reorderAccounts } from "@allocado/app/_actions/accounts";
+import { AccountCard } from "@allocado/components/accounts/AccountCard";
+import { AccountFormDialog } from "@allocado/components/accounts/AccountFormDialog";
+import { SortableCardList } from "@allocado/components/SortableCardList";
 import { requireUserId } from "@allocado/db/auth";
 import { listAccounts } from "@allocado/db/queries/accounts";
 import { listGoals } from "@allocado/db/queries/goals";
+import { listHoldingsWithAssetsForUser } from "@allocado/db/queries/holdings";
 import Link from "next/link";
-import { AccountsList } from "./AccountsList";
-
-const ACCOUNT_TYPES = [
-  { value: "taxable", label: "Taxable brokerage" },
-  { value: "ira", label: "Traditional IRA" },
-  { value: "roth_ira", label: "Roth IRA" },
-  { value: "401k", label: "401(k)" },
-  { value: "hsa", label: "HSA" },
-  { value: "other", label: "Other" },
-];
 
 export default async function AccountsPage() {
   const userId = await requireUserId();
-  const [accounts, goals] = await Promise.all([listAccounts(userId), listGoals(userId)]);
+  const [accounts, goals, holdings] = await Promise.all([
+    listAccounts(userId),
+    listGoals(userId),
+    listHoldingsWithAssetsForUser(userId),
+  ]);
+
+  const holdingsByAccount = new Map<string, typeof holdings>();
+  for (const h of holdings) {
+    const list = holdingsByAccount.get(h.accountId) ?? [];
+    list.push(h);
+    holdingsByAccount.set(h.accountId, list);
+  }
+
+  const goalOptions = goals.map((g) => ({ id: g.id, name: g.name }));
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-avocado-900">Accounts</h1>
-        <p className="text-sm text-avocado-700">
-          Brokerage or retirement accounts, each assigned to one goal.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-avocado-900">Accounts</h1>
+          <p className="text-sm text-avocado-700">
+            Brokerage or retirement accounts, each assigned to one goal.
+          </p>
+        </div>
+        {goals.length > 0 && <AccountFormDialog goals={goalOptions} />}
       </header>
 
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-lg font-medium text-avocado-800">Your accounts</h2>
-        <AccountsList accounts={accounts} />
-      </section>
-
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-lg font-medium text-avocado-800">New account</h2>
-        {goals.length === 0 ? (
-          <p className="text-sm text-avocado-700">
-            Create a{" "}
-            <Link href="/goals" className="underline">
-              goal
-            </Link>{" "}
-            first — accounts must belong to one.
-          </p>
-        ) : (
-          <form
-            action={async (formData) => {
-              "use server";
-              await createAccount(formData);
-            }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-avocado-700">Name</label>
-              <input
-                name="name"
-                type="text"
-                required
-                placeholder="Vanguard Roth IRA"
-                className="input-field"
+      {goals.length === 0 ? (
+        <p className="text-sm text-avocado-700">
+          Create a{" "}
+          <Link href="/goals" className="underline">
+            goal
+          </Link>{" "}
+          first — accounts must belong to one.
+        </p>
+      ) : accounts.length === 0 ? (
+        <p className="text-sm text-avocado-700">
+          No accounts yet. Create one with the + button above.
+        </p>
+      ) : (
+        <SortableCardList
+          onReorder={reorderAccounts}
+          items={accounts.map((account) => ({
+            id: account.id,
+            node: (
+              <AccountCard
+                account={account}
+                holdings={holdingsByAccount.get(account.id) ?? []}
+                actions={
+                  <AccountFormDialog
+                    goals={goalOptions}
+                    account={{
+                      id: account.id,
+                      name: account.name,
+                      goalId: account.goalId,
+                      accountType: account.accountType,
+                      institution: account.institution,
+                      notes: account.notes,
+                    }}
+                  />
+                }
               />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-avocado-700">Goal</label>
-              <select name="goalId" required className="input-field">
-                {goals.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-avocado-700">Type</label>
-              <select name="accountType" required className="input-field">
-                {ACCOUNT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-avocado-700">Institution</label>
-              <input
-                name="institution"
-                type="text"
-                placeholder="Vanguard"
-                className="input-field"
-              />
-            </div>
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-sm font-medium text-avocado-700">Notes</label>
-              <input name="notes" type="text" className="input-field" />
-            </div>
-            <div className="sm:col-span-2">
-              <button type="submit" className="btn-primary">
-                Create account
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
+            ),
+          }))}
+        />
+      )}
     </div>
   );
 }

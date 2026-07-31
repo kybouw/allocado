@@ -32,6 +32,12 @@
   --muted-foreground: #3d8f3d;
 
   /* shadcn component tokens */
+  --primary: var(--color-avocado-600);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-avocado-50);
+  --secondary-foreground: var(--color-avocado-800);
+  --muted: var(--color-avocado-50);
+  --input: var(--color-avocado-300);
   --destructive: #dc2626;
   --accent: var(--color-avocado-50);
   --accent-foreground: var(--color-avocado-900);
@@ -68,6 +74,12 @@
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
   --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-input: var(--input);
   --color-destructive: var(--destructive);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);

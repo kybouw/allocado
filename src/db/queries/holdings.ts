@@ -52,6 +52,22 @@ export async function listHoldingsForUser(userId: string) {
     .where(eq(accounts.userId, userId));
 }
 
+export async function listHoldingsWithAssetsForUser(userId: string) {
+  return db
+    .select({
+      id: holdings.id,
+      accountId: holdings.accountId,
+      ticker: assets.ticker,
+      assetName: assets.name,
+      value: holdings.value,
+    })
+    .from(holdings)
+    .innerJoin(accounts, eq(holdings.accountId, accounts.id))
+    .innerJoin(assets, eq(holdings.assetId, assets.id))
+    .where(eq(accounts.userId, userId))
+    .orderBy(asc(assets.ticker));
+}
+
 export async function assertAccountOwnership(userId: string, accountId: string) {
   const rows = await db
     .select({ id: accounts.id })

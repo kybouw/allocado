@@ -63,7 +63,7 @@ asset_class_type: stock | bond | cash | other
 - [x] Seed system-default asset library (common ETFs and mutual funds)
 - [x] Goals CRUD with drag-to-reorder
 - [x] Accounts CRUD (assign to goal, set account type)
-- [x] Holdings entry — add/edit shares + value per account
+- [x] Holdings entry — add/edit value per account (`shares` retained in schema, hidden from UI until price automation lands)
 - [x] Allocation targets — set Stocks/Bonds/Cash target % per goal
 - [x] Dashboard — per-goal card: total value, stacked allocation bar (current vs target), drift table
 - [x] Asset management — add custom assets, assign class allocations

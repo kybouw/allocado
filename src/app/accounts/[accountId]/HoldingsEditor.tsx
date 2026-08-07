@@ -96,7 +96,6 @@ export function HoldingsEditor({
       const prev = initialByAsset.get(row.assetId);
       if (!prev) return true;
       if (prev.value !== row.value) return true;
-      if ((prev.shares ?? "") !== (row.shares ?? "")) return true;
     }
     return false;
   }, [rows, initial]);
@@ -136,7 +135,7 @@ export function HoldingsEditor({
             return (
               <li
                 key={row.key}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_110px_140px_auto] gap-3 items-end rounded border border-avocado-100 bg-white p-3"
+                className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-3 items-end rounded border border-avocado-100 bg-white p-3"
               >
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-avocado-600">Asset</label>
@@ -170,20 +169,6 @@ export function HoldingsEditor({
                       ))}
                     </select>
                   )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor={`shares-${row.key}`} className="text-xs text-avocado-600">
-                    Shares
-                  </label>
-                  <input
-                    id={`shares-${row.key}`}
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="optional"
-                    value={row.shares}
-                    onChange={(e) => updateRow(row.key, { shares: e.target.value })}
-                    className="input-field"
-                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`value-${row.key}`} className="text-xs text-avocado-600">

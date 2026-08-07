@@ -51,6 +51,9 @@ jobs:
           done
 
       - name: Delete the Neon branch
+        # Best-effort teardown: a failure removing the Vercel env var must not
+        # strand the Neon branch, since that is the piece that costs storage.
+        if: always()
         uses: neondatabase/delete-branch-action@v3.2.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}

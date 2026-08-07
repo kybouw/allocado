@@ -12,7 +12,6 @@ type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: 
 export type HoldingInput = {
   assetId: string;
   value: string;
-  shares: string | null;
 };
 
 async function assertAccountOwned(userId: string, accountId: string) {
@@ -35,7 +34,7 @@ export async function replaceHoldings(
     await assertAccountOwned(userId, accountId);
 
     const seen = new Set<string>();
-    const normalized: { assetId: string; value: string; shares: string | null }[] = [];
+    const normalized: { assetId: string; value: string }[] = [];
     for (const item of items) {
       const assetId = String(item.assetId ?? "").trim();
       if (!assetId) return { ok: false, error: "Each row must have an asset selected" };
@@ -51,17 +50,7 @@ export async function replaceHoldings(
         return { ok: false, error: `Invalid value: ${rawValue}` };
       }
 
-      let shares: string | null = null;
-      const rawShares = item.shares == null ? "" : String(item.shares).trim();
-      if (rawShares !== "") {
-        try {
-          shares = parseMoneyInput(rawShares);
-        } catch {
-          return { ok: false, error: `Invalid share count: ${rawShares}` };
-        }
-      }
-
-      normalized.push({ assetId, value, shares });
+      normalized.push({ assetId, value });
     }
 
     if (normalized.length > 0) {
@@ -100,7 +89,6 @@ export async function replaceHoldings(
             target: [holdings.accountId, holdings.assetId],
             set: {
               value: sql`excluded.value`,
-              shares: sql`excluded.shares`,
               updatedAt: new Date(),
             },
           });

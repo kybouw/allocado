@@ -40,11 +40,10 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           # database/role default to neondb/neondb_owner, which match production.
 
-      - name: Mask connection strings
-        run: |
-          echo "::add-mask::${{ steps.neon.outputs.db_url }}"
-          echo "::add-mask::${{ steps.neon.outputs.db_url_pooled }}"
-          echo "::add-mask::${{ steps.neon.outputs.password }}"
+      # NOTE: do not add an "::add-mask::" step here. Actions echoes a run
+      # block's script into the log before executing it, so masking a literal
+      # prints the very secret it is protecting. create-branch-action already
+      # registers its connection strings as masked values.
 
       - uses: oven-sh/setup-bun@v2
         with:

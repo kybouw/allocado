@@ -9,7 +9,6 @@ export async function listHoldingsForAccount(userId: string, accountId: string) 
       assetId: holdings.assetId,
       ticker: assets.ticker,
       assetName: assets.name,
-      shares: holdings.shares,
       value: holdings.value,
       updatedAt: holdings.updatedAt,
     })
@@ -28,7 +27,6 @@ export async function listHoldingsForGoal(userId: string, goalId: string) {
       assetId: holdings.assetId,
       ticker: assets.ticker,
       assetName: assets.name,
-      shares: holdings.shares,
       value: holdings.value,
     })
     .from(holdings)
@@ -45,7 +43,6 @@ export async function listHoldingsForUser(userId: string) {
       goalId: accounts.goalId,
       assetId: holdings.assetId,
       value: holdings.value,
-      shares: holdings.shares,
     })
     .from(holdings)
     .innerJoin(accounts, eq(holdings.accountId, accounts.id))

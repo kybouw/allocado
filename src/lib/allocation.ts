@@ -3,7 +3,6 @@ import { sumMoney } from "./money";
 export type HoldingRow = {
   assetId: string;
   value: string; // numeric as string
-  shares: string | null;
 };
 
 export type AssetTypeRow = {

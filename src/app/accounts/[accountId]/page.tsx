@@ -136,7 +136,6 @@ export default async function AccountDetailPage({
             assetId: h.assetId,
             ticker: h.ticker,
             assetName: h.assetName,
-            shares: h.shares,
             value: h.value,
           }))}
         />

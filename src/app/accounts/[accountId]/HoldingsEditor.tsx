@@ -14,7 +14,6 @@ type Holding = {
   assetId: string;
   ticker: string;
   assetName: string;
-  shares: string | null;
   value: string;
 };
 
@@ -24,7 +23,6 @@ type Row = {
   assetId: string;
   ticker: string;
   assetName: string;
-  shares: string;
   value: string;
 };
 
@@ -35,7 +33,6 @@ function rowsFromHoldings(holdings: Holding[]): Row[] {
     assetId: h.assetId,
     ticker: h.ticker,
     assetName: h.assetName,
-    shares: h.shares ?? "",
     value: h.value,
   }));
 }
@@ -49,7 +46,6 @@ function makeNewRow(): Row {
     assetId: "",
     ticker: "",
     assetName: "",
-    shares: "",
     value: "",
   };
 }
@@ -113,7 +109,6 @@ export function HoldingsEditor({
     const items: HoldingInput[] = rows.map((r) => ({
       assetId: r.assetId,
       value: r.value,
-      shares: r.shares.trim() === "" ? null : r.shares,
     }));
     startTransition(async () => {
       const res = await replaceHoldings(accountId, items);

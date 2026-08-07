@@ -125,7 +125,6 @@ export const holdings = pgTable(
     assetId: uuid("asset_id")
       .notNull()
       .references(() => assets.id, { onDelete: "restrict" }),
-    shares: numeric("shares", { precision: 18, scale: 8 }),
     value: numeric("value", { precision: 19, scale: 4 }).notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

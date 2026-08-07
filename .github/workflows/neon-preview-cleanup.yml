@@ -1,0 +1,58 @@
+name: Neon preview cleanup
+
+# Tears down everything neon-preview-branch.yml created for a PR: the
+# branch-scoped Vercel env var and the Neon branch itself.
+
+on:
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: neon-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_BRANCH: preview/pr-${{ github.event.pull_request.number }}
+      GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+      VERCEL_API: https://api.vercel.com
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+
+    steps:
+      - name: Remove the branch-scoped Vercel env var
+        run: |
+          set -euo pipefail
+
+          ids=$(curl -sS -f \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "$VERCEL_API/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&gitBranch=$GIT_BRANCH" \
+            | jq -r --arg b "$GIT_BRANCH" \
+              '.envs[] | select(.key == "DATABASE_URL" and .gitBranch == $b) | .id')
+
+          if [ -z "$ids" ]; then
+            echo "No branch-scoped DATABASE_URL found for $GIT_BRANCH."
+            exit 0
+          fi
+
+          for id in $ids; do
+            curl -sS -f -X DELETE \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "$VERCEL_API/v9/projects/$VERCEL_PROJECT_ID/env/$id?teamId=$VERCEL_ORG_ID" \
+              > /dev/null
+            echo "Deleted env var $id."
+          done
+
+      - name: Delete the Neon branch
+        uses: neondatabase/delete-branch-action@v3.2.1
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ${{ env.NEON_BRANCH }}
+          api_key: ${{ secrets.NEON_API_KEY }}

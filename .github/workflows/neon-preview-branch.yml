@@ -1,0 +1,119 @@
+name: Neon preview branch
+
+# Creates (or reuses) a Neon branch for each PR, applies pending Drizzle
+# migrations to it, and points the Vercel preview deployment for this git
+# branch at it. Teardown lives in neon-preview-cleanup.yml.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: neon-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preview-db:
+    # Forked PRs cannot read secrets, so every API call below would fail.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_BRANCH: preview/pr-${{ github.event.pull_request.number }}
+      GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+      VERCEL_API: https://api.vercel.com
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6.4.0
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ env.NEON_BRANCH }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          # database/role default to neondb/neondb_owner, which match production.
+
+      - name: Mask connection strings
+        run: |
+          echo "::add-mask::${{ steps.neon.outputs.db_url }}"
+          echo "::add-mask::${{ steps.neon.outputs.db_url_pooled }}"
+          echo "::add-mask::${{ steps.neon.outputs.password }}"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply migrations to the preview branch
+        # Direct (unpooled) endpoint — DDL should not go through the pooler.
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: bun db:migrate
+
+      - name: Point Vercel preview at the Neon branch
+        id: vercel_env
+        env:
+          DB_URL_POOLED: ${{ steps.neon.outputs.db_url_pooled }}
+        run: |
+          set -euo pipefail
+
+          existing=$(curl -sS -f \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "$VERCEL_API/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&decrypt=true&gitBranch=$GIT_BRANCH" \
+            | jq -r --arg b "$GIT_BRANCH" \
+              '.envs[] | select(.key == "DATABASE_URL" and .gitBranch == $b) | .value' \
+            | head -n 1)
+
+          if [ "$existing" = "$DB_URL_POOLED" ]; then
+            echo "DATABASE_URL for $GIT_BRANCH is already correct; skipping redeploy."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          jq -n \
+            --arg value "$DB_URL_POOLED" \
+            --arg branch "$GIT_BRANCH" \
+            --arg comment "Neon branch $NEON_BRANCH (managed by neon-preview-branch.yml)" \
+            '{key: "DATABASE_URL", value: $value, type: "encrypted",
+              target: ["preview"], gitBranch: $branch, comment: $comment}' \
+          | curl -sS -f -X POST \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data @- \
+              "$VERCEL_API/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&upsert=true" \
+              > /dev/null
+
+          echo "Set DATABASE_URL for preview branch $GIT_BRANCH."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Redeploy preview with the new DATABASE_URL
+        # Vercel's own build for this push already started with the previous
+        # (project-level) DATABASE_URL. Env changes only take effect on a new
+        # build, so force one. Only needed when the value actually changed —
+        # i.e. the first run for this PR.
+        if: steps.vercel_env.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+
+          jq -n \
+            --arg name "${{ github.event.repository.name }}" \
+            --arg ref "$GIT_BRANCH" \
+            --arg sha "${{ github.event.pull_request.head.sha }}" \
+            --argjson repoId ${{ github.event.repository.id }} \
+            '{name: $name,
+              gitSource: {type: "github", repoId: $repoId, ref: $ref, sha: $sha}}' \
+          | curl -sS -f -X POST \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data @- \
+              "$VERCEL_API/v13/deployments?teamId=$VERCEL_ORG_ID&forceNew=1&skipAutoDetectionConfirmation=1" \
+            | jq -r '"Triggered preview deployment: https://" + .url'

@@ -70,8 +70,7 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "$VERCEL_API/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&decrypt=true&gitBranch=$GIT_BRANCH" \
             | jq -r --arg b "$GIT_BRANCH" \
-              '.envs[] | select(.key == "DATABASE_URL" and .gitBranch == $b) | .value' \
-            | head -n 1)
+              'first(.envs[]? | select(.key == "DATABASE_URL" and .gitBranch == $b) | .value) // ""')
 
           if [ "$existing" = "$DB_URL_POOLED" ]; then
             echo "DATABASE_URL for $GIT_BRANCH is already correct; skipping redeploy."
@@ -108,7 +107,7 @@ jobs:
             --arg name "${{ github.event.repository.name }}" \
             --arg ref "$GIT_BRANCH" \
             --arg sha "${{ github.event.pull_request.head.sha }}" \
-            --argjson repoId ${{ github.event.repository.id }} \
+            --argjson repoId '${{ github.event.repository.id }}' \
             '{name: $name,
               gitSource: {type: "github", repoId: $repoId, ref: $ref, sha: $sha}}' \
           | curl -sS -f -X POST \

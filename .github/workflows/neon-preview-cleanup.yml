@@ -35,7 +35,7 @@ jobs:
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             "$VERCEL_API/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&gitBranch=$GIT_BRANCH" \
             | jq -r --arg b "$GIT_BRANCH" \
-              '.envs[] | select(.key == "DATABASE_URL" and .gitBranch == $b) | .id')
+              '.envs[]? | select(.key == "DATABASE_URL" and .gitBranch == $b) | .id')
 
           if [ -z "$ids" ]; then
             echo "No branch-scoped DATABASE_URL found for $GIT_BRANCH."

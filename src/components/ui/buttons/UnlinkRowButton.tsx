@@ -25,7 +25,7 @@ export function UnlinkRowButton({
           onClick={onClick}
           disabled={disabled}
           aria-label={label}
-          className={`border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700 ${className ?? ""}`}
+          className={`border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 ${className ?? ""}`}
         >
           <Unlink className="size-4" />
         </Button>

@@ -9,8 +9,8 @@ import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
 import {
   getPlaidLinkForAccount,
   getPlaidManagedAssetIdsForAccount,
+  listPositionsForPlaidAccount,
   listUnlinkedPlaidAccounts,
-  listUnmappedPositionsForPlaidAccount,
 } from "@allocado/db/queries/plaid";
 import { ACCOUNT_TYPES } from "@allocado/lib/account-types";
 import Link from "next/link";
@@ -36,8 +36,8 @@ export default async function AccountDetailPage({
       getPlaidManagedAssetIdsForAccount(accountId),
       listUnlinkedPlaidAccounts(userId),
     ]);
-  const unmappedPositions = plaidLink
-    ? await listUnmappedPositionsForPlaidAccount(plaidLink.plaidAccountRowId)
+  const positions = plaidLink
+    ? await listPositionsForPlaidAccount(plaidLink.plaidAccountRowId)
     : [];
 
   return (
@@ -140,7 +140,7 @@ export default async function AccountDetailPage({
         accountId={accountId}
         link={plaidLink}
         unlinkedPlaidAccounts={unlinkedPlaidAccounts}
-        unmappedPositions={unmappedPositions}
+        positions={positions}
         assets={assets.map((a) => ({ id: a.id, ticker: a.ticker, name: a.name }))}
       />
 

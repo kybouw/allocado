@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "../index";
 import {
   accounts,
@@ -67,14 +67,15 @@ export async function getPlaidLinkForAccount(userId: string, accountId: string) 
   return rows[0] ?? null;
 }
 
-/** Current positions in a Plaid account that have no mapping yet. */
-export async function listUnmappedPositionsForPlaidAccount(plaidAccountRowId: string) {
+/** All current positions in a Plaid account with their mapping (assetId null = unmapped). */
+export async function listPositionsForPlaidAccount(plaidAccountRowId: string) {
   return db
     .select({
       securityRowId: plaidSecurities.id,
       ticker: plaidSecurities.ticker,
       name: plaidSecurities.name,
       value: plaidHoldings.institutionValue,
+      assetId: plaidAccountSecurities.assetId,
     })
     .from(plaidHoldings)
     .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
@@ -85,28 +86,8 @@ export async function listUnmappedPositionsForPlaidAccount(plaidAccountRowId: st
         eq(plaidAccountSecurities.plaidSecurityId, plaidHoldings.plaidSecurityId),
       ),
     )
-    .where(
-      and(eq(plaidHoldings.plaidAccountId, plaidAccountRowId), isNull(plaidAccountSecurities.id)),
-    )
+    .where(eq(plaidHoldings.plaidAccountId, plaidAccountRowId))
     .orderBy(asc(plaidSecurities.ticker), asc(plaidSecurities.name));
-}
-
-/** Total value of current unmapped positions in a Plaid account. */
-export async function getUnmappedValueForPlaidAccount(plaidAccountRowId: string) {
-  const [{ total }] = await db
-    .select({ total: sql<string | null>`sum(${plaidHoldings.institutionValue})` })
-    .from(plaidHoldings)
-    .leftJoin(
-      plaidAccountSecurities,
-      and(
-        eq(plaidAccountSecurities.plaidAccountId, plaidHoldings.plaidAccountId),
-        eq(plaidAccountSecurities.plaidSecurityId, plaidHoldings.plaidSecurityId),
-      ),
-    )
-    .where(
-      and(eq(plaidHoldings.plaidAccountId, plaidAccountRowId), isNull(plaidAccountSecurities.id)),
-    );
-  return total;
 }
 
 /** Asset ids whose holdings in this app account are managed by Plaid sync (current positions only). */

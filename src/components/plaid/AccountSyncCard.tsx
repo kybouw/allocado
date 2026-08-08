@@ -5,10 +5,17 @@ import { linkPlaidAccount, mapPlaidPosition, syncPlaidItem } from "@allocado/app
 import { formatRelativeTime } from "@allocado/components/plaid/relative-time";
 import { Badge } from "@allocado/components/ui/badge";
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@allocado/components/ui/select";
 import { formatUSD } from "@allocado/lib/money";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 export type AccountPlaidLink = {
@@ -21,18 +28,21 @@ export type AccountPlaidLink = {
   lastSyncedAt: Date | null;
 };
 
-export type UnmappedPosition = {
+export type PlaidPosition = {
   securityRowId: string;
   ticker: string | null;
   name: string | null;
   value: string;
+  assetId: string | null;
 };
+
+const UNMAPPED = "__unmapped__";
 
 export function AccountSyncCard({
   accountId,
   link,
   unlinkedPlaidAccounts,
-  unmappedPositions,
+  positions,
   assets,
 }: {
   accountId: string;
@@ -43,7 +53,7 @@ export function AccountSyncCard({
     mask: string | null;
     institutionName: string | null;
   }>;
-  unmappedPositions: UnmappedPosition[];
+  positions: PlaidPosition[];
   assets: Array<{ id: string; ticker: string; name: string }>;
 }) {
   const [selected, setSelected] = useState("");
@@ -78,21 +88,20 @@ export function AccountSyncCard({
           .
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="input-field"
-            aria-label="Choose a connected brokerage account"
-          >
-            <option value="">Choose a brokerage account…</option>
-            {unlinkedPlaidAccounts.map((pa) => (
-              <option key={pa.id} value={pa.id}>
-                {pa.institutionName ? `${pa.institutionName} — ` : ""}
-                {pa.name}
-                {pa.mask ? ` ····${pa.mask}` : ""}
-              </option>
-            ))}
-          </select>
+          <Select value={selected} onValueChange={setSelected} disabled={isPending}>
+            <SelectTrigger className="min-w-[260px]">
+              <SelectValue placeholder="Choose a brokerage account…" />
+            </SelectTrigger>
+            <SelectContent>
+              {unlinkedPlaidAccounts.map((pa) => (
+                <SelectItem key={pa.id} value={pa.id}>
+                  {pa.institutionName ? `${pa.institutionName} — ` : ""}
+                  {pa.name}
+                  {pa.mask ? ` ····${pa.mask}` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <SecondaryButton
             type="button"
             onClick={() => setLink(selected, accountId)}
@@ -150,16 +159,12 @@ export function AccountSyncCard({
         )}
       </p>
 
-      {unmappedPositions.length > 0 && (
+      {positions.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            These synced positions aren&apos;t counted in this account yet. Map each to an asset to
-            create its holding. If the asset already has a manual holding here, sync takes over its
-            value.
-          </p>
+          <h3 className="text-sm font-medium text-avocado-800">Synced positions</h3>
           <ul className="flex flex-col gap-2">
-            {unmappedPositions.map((p) => (
-              <UnmappedPositionRow
+            {positions.map((p) => (
+              <PositionRow
                 key={p.securityRowId}
                 plaidAccountRowId={link.plaidAccountRowId}
                 position={p}
@@ -173,23 +178,34 @@ export function AccountSyncCard({
   );
 }
 
-function UnmappedPositionRow({
+function PositionRow({
   plaidAccountRowId,
   position,
   assets,
 }: {
   plaidAccountRowId: string;
-  position: UnmappedPosition;
+  position: PlaidPosition;
   assets: Array<{ id: string; ticker: string; name: string }>;
 }) {
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(position.assetId ?? UNMAPPED);
   const [isPending, startTransition] = useTransition();
 
-  function map(assetId: string) {
+  useEffect(() => {
+    setSelected(position.assetId ?? UNMAPPED);
+  }, [position.assetId]);
+
+  function handleChange(value: string) {
+    const previous = selected;
+    setSelected(value);
     startTransition(async () => {
+      const assetId = value === UNMAPPED ? null : value;
       const res = await mapPlaidPosition(plaidAccountRowId, position.securityRowId, assetId);
-      if (res.ok) toast.success("Position mapped.");
-      else toast.error(res.error);
+      if (res.ok) {
+        toast.success(assetId ? "Position mapped." : "Position unmapped.");
+      } else {
+        setSelected(previous);
+        toast.error(res.error);
+      }
     });
   }
 
@@ -208,8 +224,12 @@ function UnmappedPositionRow({
         position.securityRowId,
         created.data.id,
       );
-      if (res.ok) toast.success("Asset created and mapped. Set its allocation on the Assets page.");
-      else toast.error(res.error);
+      if (res.ok) {
+        setSelected(created.data.id);
+        toast.success("Asset created and mapped. Set its allocation on the Assets page.");
+      } else {
+        toast.error(res.error);
+      }
     });
   }
 
@@ -225,28 +245,24 @@ function UnmappedPositionRow({
         <span className="ml-2 text-avocado-700">{formatUSD(position.value)}</span>
       </div>
       <div className="flex items-center gap-2">
-        <select
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          className="input-field"
-          aria-label={`Map ${position.ticker ?? position.name ?? "position"} to an asset`}
-        >
-          <option value="">Map to asset…</option>
-          {assets.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.ticker} — {a.name}
-            </option>
-          ))}
-        </select>
-        <SecondaryButton
-          type="button"
-          onClick={() => map(selected)}
-          disabled={isPending || !selected}
-        >
-          {isPending && <Loader2 className="mr-1 inline size-3.5 animate-spin" />}
-          Map
-        </SecondaryButton>
-        {position.ticker && (
+        {isPending && <Loader2 className="size-3.5 animate-spin text-avocado-600" />}
+        <Select value={selected} onValueChange={handleChange} disabled={isPending}>
+          <SelectTrigger
+            className="min-w-[220px]"
+            aria-label={`Map ${position.ticker ?? position.name ?? "position"} to an asset`}
+          >
+            <SelectValue placeholder="Map to asset…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNMAPPED}>Not mapped</SelectItem>
+            {assets.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.ticker} — {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selected === UNMAPPED && position.ticker && (
           <SecondaryButton type="button" onClick={createAndMap} disabled={isPending}>
             Create asset
           </SecondaryButton>

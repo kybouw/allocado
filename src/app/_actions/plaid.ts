@@ -448,7 +448,10 @@ async function syncItemInternal(userId: string, itemId: string): Promise<void> {
   for (const [plaidAccountId, accountRowId] of accountRowIdByPlaidId) {
     const rows = holdingList.filter((h) => h.account_id === plaidAccountId);
 
-    const snapshot: { securityRowId: string; value: string; price: string | null }[] = [];
+    // Plaid may return several records for the same security in one account
+    // (separate tax lots); aggregate them or the snapshot upsert would hit the
+    // same (account, security) key twice in one statement.
+    const bySecurity = new Map<string, { value: number; price: number | null }>();
     for (const h of rows) {
       const securityRowId = securityRowIdByPlaidId.get(h.security_id);
       if (!securityRowId) continue;
@@ -457,12 +460,19 @@ async function syncItemInternal(userId: string, itemId: string): Promise<void> {
         (h.institution_price != null ? h.quantity * h.institution_price : null);
       if (rawValue == null || !Number.isFinite(rawValue)) continue;
       const price = h.institution_price ?? closePriceBySecurityRowId.get(securityRowId) ?? null;
-      snapshot.push({
-        securityRowId,
-        value: moneyFromNumber(rawValue),
-        price: price != null ? moneyFromNumber(price) : null,
-      });
+      const prev = bySecurity.get(securityRowId);
+      if (prev) {
+        prev.value += rawValue;
+        if (prev.price == null) prev.price = price;
+      } else {
+        bySecurity.set(securityRowId, { value: rawValue, price });
+      }
     }
+    const snapshot = [...bySecurity.entries()].map(([securityRowId, v]) => ({
+      securityRowId,
+      value: moneyFromNumber(v.value),
+      price: v.price != null ? moneyFromNumber(v.price) : null,
+    }));
 
     const [linkRow] = await db
       .select({ accountId: plaidAccounts.accountId })

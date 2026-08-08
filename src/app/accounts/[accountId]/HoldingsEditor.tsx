@@ -1,9 +1,11 @@
 "use client";
 
 import { type HoldingInput, replaceHoldings } from "@allocado/app/_actions/holdings";
+import { unmapPlaidAsset } from "@allocado/app/_actions/plaid";
 import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton";
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
 import { SubmitButton } from "@allocado/components/ui/buttons/SubmitButton";
+import { UnlinkRowButton } from "@allocado/components/ui/buttons/UnlinkRowButton";
 import { formatUSD } from "@allocado/lib/money";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -66,6 +68,16 @@ export function HoldingsEditor({
   const [isPending, startTransition] = useTransition();
   const managed = useMemo(() => new Set(managedAssetIds), [managedAssetIds]);
 
+  // Re-seed local rows when the server sends different holdings (e.g. a Plaid
+  // sync or mapping updated values underneath this editor).
+  const [seededFrom, setSeededFrom] = useState(initial);
+  if (seededFrom !== initial) {
+    setSeededFrom(initial);
+    if (JSON.stringify(seededFrom) !== JSON.stringify(initial)) {
+      setRows(initial);
+    }
+  }
+
   const total = rows.reduce((acc, r) => {
     const n = Number(r.value);
     return acc + (Number.isFinite(n) ? n : 0);
@@ -85,6 +97,14 @@ export function HoldingsEditor({
 
   function reset() {
     setRows(initial);
+  }
+
+  function unlinkRow(assetId: string, ticker: string) {
+    startTransition(async () => {
+      const res = await unmapPlaidAsset(accountId, assetId);
+      if (res.ok) toast.success(`${ticker} detached from Plaid sync — it's manual now.`);
+      else toast.error(res.error);
+    });
   }
 
   const usedAssetIds = new Set(rows.map((r) => r.assetId).filter(Boolean));
@@ -194,7 +214,11 @@ export function HoldingsEditor({
                   />
                 </div>
                 {isManaged ? (
-                  <div />
+                  <UnlinkRowButton
+                    onClick={() => unlinkRow(row.assetId, row.ticker)}
+                    disabled={isPending}
+                    label={`Detach ${row.ticker} from Plaid sync`}
+                  />
                 ) : (
                   <RemoveRowButton onClick={() => removeRow(row.key)} label="Remove holding" />
                 )}

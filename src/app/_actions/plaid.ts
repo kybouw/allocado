@@ -230,6 +230,40 @@ export async function mapPlaidPosition(
   }
 }
 
+/**
+ * Detach an asset's holding in this account from Plaid sync. Removes every
+ * position mapping feeding that asset; the holding keeps its current value and
+ * becomes manually editable again.
+ */
+export async function unmapPlaidAsset(accountId: string, assetId: string): Promise<ActionResult> {
+  try {
+    const userId = await requireUserId();
+
+    const rows = await db
+      .select({ plaidAccountRowId: plaidAccounts.id })
+      .from(plaidAccounts)
+      .innerJoin(accounts, eq(plaidAccounts.accountId, accounts.id))
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, accountId)))
+      .limit(1);
+    if (!rows[0]) return { ok: false, error: "This account isn't linked to Plaid" };
+
+    await db
+      .delete(plaidAccountSecurities)
+      .where(
+        and(
+          eq(plaidAccountSecurities.plaidAccountId, rows[0].plaidAccountRowId),
+          eq(plaidAccountSecurities.assetId, assetId),
+        ),
+      );
+
+    revalidatePath(`/accounts/${accountId}`);
+    revalidatePath("/accounts");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function syncPlaidItem(itemId: string): Promise<ActionResult> {
   try {
     const userId = await requireUserId();

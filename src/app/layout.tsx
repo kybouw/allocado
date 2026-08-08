@@ -63,6 +63,9 @@ export default function RootLayout({
                       <Link href="/assets" className="hover:text-avocado-900 hover:underline">
                         Assets
                       </Link>
+                      <Link href="/settings" className="hover:text-avocado-900 hover:underline">
+                        Settings
+                      </Link>
                     </nav>
                     <UserButton afterSignOutUrl="/sign-in" />
                   </SignedIn>

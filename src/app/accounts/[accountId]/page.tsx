@@ -1,10 +1,17 @@
 import { deleteAccount, updateAccount } from "@allocado/app/_actions/accounts";
+import { AccountSyncCard } from "@allocado/components/plaid/AccountSyncCard";
 import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAccount } from "@allocado/db/queries/accounts";
 import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
+import {
+  getPlaidLinkForAccount,
+  getPlaidManagedAssetIdsForAccount,
+  listPositionsForPlaidAccount,
+  listUnlinkedPlaidAccounts,
+} from "@allocado/db/queries/plaid";
 import { ACCOUNT_TYPES } from "@allocado/lib/account-types";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,11 +27,18 @@ export default async function AccountDetailPage({
   const account = await getAccount(userId, accountId);
   if (!account) notFound();
 
-  const [holdings, assets, goals] = await Promise.all([
-    listHoldingsForAccount(userId, accountId),
-    listAssetsForUser(userId),
-    listGoals(userId),
-  ]);
+  const [holdings, assets, goals, plaidLink, managedAssetIds, unlinkedPlaidAccounts] =
+    await Promise.all([
+      listHoldingsForAccount(userId, accountId),
+      listAssetsForUser(userId),
+      listGoals(userId),
+      getPlaidLinkForAccount(userId, accountId),
+      getPlaidManagedAssetIdsForAccount(accountId),
+      listUnlinkedPlaidAccounts(userId),
+    ]);
+  const positions = plaidLink
+    ? await listPositionsForPlaidAccount(plaidLink.plaidAccountRowId)
+    : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -122,6 +136,14 @@ export default async function AccountDetailPage({
         </form>
       </section>
 
+      <AccountSyncCard
+        accountId={accountId}
+        link={plaidLink}
+        unlinkedPlaidAccounts={unlinkedPlaidAccounts}
+        positions={positions}
+        assets={assets.map((a) => ({ id: a.id, ticker: a.ticker, name: a.name }))}
+      />
+
       <section className="card flex flex-col gap-4">
         <h2 className="text-lg font-medium text-avocado-800">Holdings</h2>
         <HoldingsEditor
@@ -138,6 +160,7 @@ export default async function AccountDetailPage({
             assetName: h.assetName,
             value: h.value,
           }))}
+          managedAssetIds={managedAssetIds}
         />
       </section>
     </div>

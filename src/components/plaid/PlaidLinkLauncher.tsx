@@ -7,6 +7,7 @@ import {
 } from "@allocado/app/_actions/plaid";
 import { PrimaryButton } from "@allocado/components/ui/buttons/PrimaryButton";
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { usePlaidLink } from "react-plaid-link";
@@ -32,6 +33,10 @@ export function PlaidLinkLauncher({
   const { open, ready } = usePlaidLink({
     token: linkToken,
     onSuccess: (publicToken, metadata) => {
+      setLinkToken(null);
+      const toastId = toast.loading(
+        itemId ? "Re-authenticating…" : "Connecting — pulling your accounts from Plaid…",
+      );
       startTransition(async () => {
         const res = itemId
           ? await syncPlaidItem(itemId)
@@ -40,12 +45,11 @@ export function PlaidLinkLauncher({
               institutionName: metadata.institution?.name ?? null,
             });
         if (res.ok) {
-          toast.success(itemId ? "Reconnected." : "Institution connected.");
+          toast.success(itemId ? "Reconnected." : "Institution connected.", { id: toastId });
           router.refresh();
         } else {
-          toast.error(res.error);
+          toast.error(res.error, { id: toastId });
         }
-        setLinkToken(null);
       });
     },
     onExit: () => setLinkToken(null),
@@ -63,9 +67,11 @@ export function PlaidLinkLauncher({
     });
   }
 
+  const busy = isPending || linkToken != null;
   const Button = variant === "primary" ? PrimaryButton : SecondaryButton;
   return (
-    <Button type="button" onClick={launch} disabled={isPending || linkToken != null}>
+    <Button type="button" onClick={launch} disabled={busy}>
+      {busy && <Loader2 className="mr-1 inline size-3.5 animate-spin" />}
       {children}
     </Button>
   );

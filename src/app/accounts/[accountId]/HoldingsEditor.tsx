@@ -54,14 +54,17 @@ export function HoldingsEditor({
   accountId,
   assets,
   holdings,
+  managedAssetIds = [],
 }: {
   accountId: string;
   assets: Asset[];
   holdings: Holding[];
+  managedAssetIds?: string[];
 }) {
   const initial = useMemo(() => rowsFromHoldings(holdings), [holdings]);
   const [rows, setRows] = useState<Row[]>(initial);
   const [isPending, startTransition] = useTransition();
+  const managed = useMemo(() => new Set(managedAssetIds), [managedAssetIds]);
 
   const total = rows.reduce((acc, r) => {
     const n = Number(r.value);
@@ -86,15 +89,17 @@ export function HoldingsEditor({
 
   const usedAssetIds = new Set(rows.map((r) => r.assetId).filter(Boolean));
   const isDirty = useMemo(() => {
-    if (rows.length !== initial.length) return true;
-    const initialByAsset = new Map(initial.map((r) => [r.assetId, r]));
-    for (const row of rows) {
+    const editable = rows.filter((r) => !managed.has(r.assetId));
+    const initialEditable = initial.filter((r) => !managed.has(r.assetId));
+    if (editable.length !== initialEditable.length) return true;
+    const initialByAsset = new Map(initialEditable.map((r) => [r.assetId, r]));
+    for (const row of editable) {
       const prev = initialByAsset.get(row.assetId);
       if (!prev) return true;
       if (prev.value !== row.value) return true;
     }
     return false;
-  }, [rows, initial]);
+  }, [rows, initial, managed]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,10 +111,12 @@ export function HoldingsEditor({
       toast.error("Every row needs a value");
       return;
     }
-    const items: HoldingInput[] = rows.map((r) => ({
-      assetId: r.assetId,
-      value: r.value,
-    }));
+    const items: HoldingInput[] = rows
+      .filter((r) => !managed.has(r.assetId))
+      .map((r) => ({
+        assetId: r.assetId,
+        value: r.value,
+      }));
     startTransition(async () => {
       const res = await replaceHoldings(accountId, items);
       if (res.ok) toast.success("Saved.");
@@ -127,6 +134,7 @@ export function HoldingsEditor({
             const availableAssets = assets.filter(
               (a) => a.id === row.assetId || !usedAssetIds.has(a.id),
             );
+            const isManaged = managed.has(row.assetId);
             return (
               <li
                 key={row.key}
@@ -138,6 +146,11 @@ export function HoldingsEditor({
                     <div className="py-2 text-sm">
                       <span className="font-medium text-avocado-900">{row.ticker}</span>
                       <span className="ml-2 text-avocado-600">— {row.assetName}</span>
+                      {isManaged && (
+                        <span className="ml-2 rounded bg-avocado-100 px-1.5 py-0.5 text-xs text-avocado-700">
+                          Plaid
+                        </span>
+                      )}
                     </div>
                   ) : (
                     <select
@@ -174,12 +187,17 @@ export function HoldingsEditor({
                     type="text"
                     inputMode="decimal"
                     required
+                    disabled={isManaged}
                     value={row.value}
                     onChange={(e) => updateRow(row.key, { value: e.target.value })}
-                    className="input-field"
+                    className="input-field disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
-                <RemoveRowButton onClick={() => removeRow(row.key)} label="Remove holding" />
+                {isManaged ? (
+                  <div />
+                ) : (
+                  <RemoveRowButton onClick={() => removeRow(row.key)} label="Remove holding" />
+                )}
               </li>
             );
           })}

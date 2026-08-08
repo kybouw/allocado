@@ -77,10 +77,10 @@ asset_class_type: stock | bond | cash | other
 ### Phase 3 — Power features
 
 - [ ] Glide path targets (dated `allocation_targets` rows, auto-advance over time)
-- [ ] Price auto-fetch via brokerage/market data API
+- [ ] Price auto-fetch via brokerage/market data API (partially covered by Plaid sync: synced holdings update `assets.price` for user-owned assets)
 - [ ] Tax-lot tracking (cost basis, STCG vs LTCG, harvest candidates)
 - [ ] Tax-location suggestions (e.g., hold bonds in tax-deferred, stocks in Roth)
-- [ ] Brokerage sync (Plaid or direct API)
+- [x] Brokerage sync via Plaid Investments (KB-27) — connect institutions, link Plaid accounts to app accounts, map securities to assets, manual "Sync now" pulls holdings values. Tables: `plaid_items`, `plaid_accounts`, `plaid_securities`, `plaid_holdings` (raw snapshot; mapped values roll up into `holdings.value`). Webhooks/cron deliberately deferred.
 
 ---
 

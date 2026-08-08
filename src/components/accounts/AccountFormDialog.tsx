@@ -29,9 +29,11 @@ type AccountFormValues = {
 export function AccountFormDialog({
   account,
   goals,
+  onCreated,
 }: {
   account?: AccountFormValues;
   goals: Array<{ id: string; name: string }>;
+  onCreated?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -47,6 +49,7 @@ export function AccountFormDialog({
       if (res.ok) {
         toast.success(isEdit ? "Account updated." : "Account created.");
         setOpen(false);
+        if (!isEdit && res.data && onCreated) onCreated(res.data.id);
       } else {
         toast.error(res.error ?? "Something went wrong.");
       }

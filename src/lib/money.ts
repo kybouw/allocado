@@ -31,6 +31,14 @@ export function parseMoneyInput(input: string): string {
   return cleaned;
 }
 
+/** Convert an API-provided float (e.g. Plaid) to a string suitable for numeric(19,4). */
+export function moneyFromNumber(n: number): string {
+  if (!Number.isFinite(n)) {
+    throw new Error(`invalid money value: ${n}`);
+  }
+  return n.toFixed(4);
+}
+
 /** Sum an array of decimal-string amounts without losing precision for typical portfolio sizes. */
 export function sumMoney(values: Array<string | null | undefined>): string {
   let total = 0;

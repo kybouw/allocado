@@ -1,11 +1,18 @@
 import { deleteAccount, updateAccount } from "@allocado/app/_actions/accounts";
+import { formatRelativeTime } from "@allocado/components/plaid/relative-time";
+import { SyncNowButton } from "@allocado/components/plaid/SyncNowButton";
 import { DeleteButton } from "@allocado/components/ui/buttons/DeleteButton";
 import { requireUserId } from "@allocado/db/auth";
 import { getAccount } from "@allocado/db/queries/accounts";
 import { listAssetsForUser } from "@allocado/db/queries/assets";
 import { listGoals } from "@allocado/db/queries/goals";
 import { listHoldingsForAccount } from "@allocado/db/queries/holdings";
+import {
+  getPlaidLinkForAccount,
+  getPlaidManagedAssetIdsForAccount,
+} from "@allocado/db/queries/plaid";
 import { ACCOUNT_TYPES } from "@allocado/lib/account-types";
+import { formatUSD } from "@allocado/lib/money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HoldingsEditor } from "./HoldingsEditor";
@@ -20,10 +27,12 @@ export default async function AccountDetailPage({
   const account = await getAccount(userId, accountId);
   if (!account) notFound();
 
-  const [holdings, assets, goals] = await Promise.all([
+  const [holdings, assets, goals, plaidLink, managedAssetIds] = await Promise.all([
     listHoldingsForAccount(userId, accountId),
     listAssetsForUser(userId),
     listGoals(userId),
+    getPlaidLinkForAccount(userId, accountId),
+    getPlaidManagedAssetIdsForAccount(accountId),
   ]);
 
   return (
@@ -123,7 +132,29 @@ export default async function AccountDetailPage({
       </section>
 
       <section className="card flex flex-col gap-4">
-        <h2 className="text-lg font-medium text-avocado-800">Holdings</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-medium text-avocado-800">Holdings</h2>
+          {plaidLink && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-avocado-600">
+                Synced from {plaidLink.institutionName ?? "Plaid"}
+                {plaidLink.lastSyncedAt
+                  ? ` · last synced ${formatRelativeTime(plaidLink.lastSyncedAt)}`
+                  : ""}
+              </span>
+              <SyncNowButton itemId={plaidLink.itemId} />
+            </div>
+          )}
+        </div>
+        {plaidLink?.unmappedValue && Number(plaidLink.unmappedValue) > 0 && (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {formatUSD(plaidLink.unmappedValue)} from this account isn't counted yet —{" "}
+            <Link href="/accounts" className="underline">
+              map its securities
+            </Link>{" "}
+            to include it.
+          </p>
+        )}
         <HoldingsEditor
           accountId={accountId}
           assets={assets.map((a) => ({
@@ -138,6 +169,7 @@ export default async function AccountDetailPage({
             assetName: h.assetName,
             value: h.value,
           }))}
+          managedAssetIds={managedAssetIds}
         />
       </section>
     </div>

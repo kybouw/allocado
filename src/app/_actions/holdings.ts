@@ -2,6 +2,7 @@
 
 import { db } from "@allocado/db";
 import { requireUserId } from "@allocado/db/auth";
+import { getPlaidManagedAssetIdsForAccount } from "@allocado/db/queries/plaid";
 import { accounts, assets, holdings } from "@allocado/db/schema";
 import { parseMoneyInput } from "@allocado/lib/money";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -33,6 +34,9 @@ export async function replaceHoldings(
 
     await assertAccountOwned(userId, accountId);
 
+    // Holdings derived from Plaid sync can't be edited or deleted here.
+    const managedAssetIds = new Set(await getPlaidManagedAssetIdsForAccount(accountId));
+
     const seen = new Set<string>();
     const normalized: { assetId: string; value: string }[] = [];
     for (const item of items) {
@@ -40,6 +44,9 @@ export async function replaceHoldings(
       if (!assetId) return { ok: false, error: "Each row must have an asset selected" };
       if (seen.has(assetId)) return { ok: false, error: "Each asset may only appear once" };
       seen.add(assetId);
+      if (managedAssetIds.has(assetId)) {
+        return { ok: false, error: "This holding is synced from Plaid and can't be edited here" };
+      }
 
       const rawValue = String(item.value ?? "").trim();
       if (!rawValue) return { ok: false, error: "Value is required for every row" };
@@ -74,7 +81,9 @@ export async function replaceHoldings(
       const existingIds = new Set(existing.map((r) => r.assetId));
       const desiredIds = new Set(normalized.map((n) => n.assetId));
 
-      const toDelete = [...existingIds].filter((id) => !desiredIds.has(id));
+      const toDelete = [...existingIds].filter(
+        (id) => !desiredIds.has(id) && !managedAssetIds.has(id),
+      );
       if (toDelete.length > 0) {
         await tx
           .delete(holdings)

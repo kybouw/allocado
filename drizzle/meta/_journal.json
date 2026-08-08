@@ -50,6 +50,13 @@
       "when": 1786221357044,
       "tag": "0006_green_hammerhead",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786223260773,
+      "tag": "0007_legal_zarek",
+      "breakpoints": true
     }
   ]
 }

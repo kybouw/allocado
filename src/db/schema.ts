@@ -208,13 +208,33 @@ export const plaidSecurities = pgTable(
     plaidSecurityId: text("plaid_security_id").notNull(),
     ticker: text("ticker"),
     name: text("name"),
-    assetId: uuid("asset_id").references(() => assets.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
     index("plaid_securities_user_id_idx").on(t.userId),
     unique("plaid_securities_user_sec_unique").on(t.userId, t.plaidSecurityId),
   ],
+);
+
+// Per-account mapping: a Plaid position in this account feeds this asset's
+// holding. The same security may map differently (or not at all) in another
+// account. Rows survive syncs so a temporarily-sold position keeps its mapping.
+export const plaidAccountSecurities = pgTable(
+  "plaid_account_securities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    plaidAccountId: uuid("plaid_account_id")
+      .notNull()
+      .references(() => plaidAccounts.id, { onDelete: "cascade" }),
+    plaidSecurityId: uuid("plaid_security_id")
+      .notNull()
+      .references(() => plaidSecurities.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => assets.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("plaid_account_securities_unique").on(t.plaidAccountId, t.plaidSecurityId)],
 );
 
 export const plaidHoldings = pgTable(
@@ -281,9 +301,21 @@ export const plaidAccountsRelations = relations(plaidAccounts, ({ one, many }) =
   plaidHoldings: many(plaidHoldings),
 }));
 
-export const plaidSecuritiesRelations = relations(plaidSecurities, ({ one, many }) => ({
-  asset: one(assets, { fields: [plaidSecurities.assetId], references: [assets.id] }),
+export const plaidSecuritiesRelations = relations(plaidSecurities, ({ many }) => ({
   plaidHoldings: many(plaidHoldings),
+  accountMappings: many(plaidAccountSecurities),
+}));
+
+export const plaidAccountSecuritiesRelations = relations(plaidAccountSecurities, ({ one }) => ({
+  plaidAccount: one(plaidAccounts, {
+    fields: [plaidAccountSecurities.plaidAccountId],
+    references: [plaidAccounts.id],
+  }),
+  security: one(plaidSecurities, {
+    fields: [plaidAccountSecurities.plaidSecurityId],
+    references: [plaidSecurities.id],
+  }),
+  asset: one(assets, { fields: [plaidAccountSecurities.assetId], references: [assets.id] }),
 }));
 
 export const plaidHoldingsRelations = relations(plaidHoldings, ({ one }) => ({

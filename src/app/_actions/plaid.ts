@@ -6,6 +6,7 @@ import {
   accounts,
   assets,
   holdings,
+  plaidAccountSecurities,
   plaidAccounts,
   plaidHoldings,
   plaidItems,
@@ -26,6 +27,17 @@ async function assertPlaidItemOwned(userId: string, itemId: string) {
     .where(and(eq(plaidItems.userId, userId), eq(plaidItems.id, itemId)))
     .limit(1);
   if (!rows[0]) throw new Error("connection not found");
+  return rows[0];
+}
+
+async function assertPlaidAccountOwned(userId: string, plaidAccountRowId: string) {
+  const rows = await db
+    .select({ id: plaidAccounts.id, accountId: plaidAccounts.accountId })
+    .from(plaidAccounts)
+    .innerJoin(plaidItems, eq(plaidAccounts.itemId, plaidItems.id))
+    .where(and(eq(plaidItems.userId, userId), eq(plaidAccounts.id, plaidAccountRowId)))
+    .limit(1);
+  if (!rows[0]) throw new Error("connected account not found");
   return rows[0];
 }
 
@@ -99,8 +111,7 @@ export async function exchangePlaidPublicToken(
 
     await syncItemInternal(userId, item.id);
 
-    revalidatePath("/accounts");
-    revalidatePath("/dashboard");
+    revalidatePath("/settings");
     return { ok: true, data: { itemId: item.id } };
   } catch (e) {
     return { ok: false, error: plaidErrorCode(e) ?? (e as Error).message };
@@ -113,14 +124,7 @@ export async function linkPlaidAccount(
 ): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
-
-    const rows = await db
-      .select({ id: plaidAccounts.id })
-      .from(plaidAccounts)
-      .innerJoin(plaidItems, eq(plaidAccounts.itemId, plaidItems.id))
-      .where(and(eq(plaidItems.userId, userId), eq(plaidAccounts.id, plaidAccountRowId)))
-      .limit(1);
-    if (!rows[0]) return { ok: false, error: "connected account not found" };
+    const plaidAccount = await assertPlaidAccountOwned(userId, plaidAccountRowId);
 
     if (accountId) {
       const owned = await db
@@ -142,29 +146,34 @@ export async function linkPlaidAccount(
       // Unlinking leaves existing holdings in place — they simply become manual.
     });
 
+    revalidatePath("/settings");
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
-    if (accountId) revalidatePath(`/accounts/${accountId}`);
+    for (const id of [accountId, plaidAccount.accountId]) {
+      if (id) revalidatePath(`/accounts/${id}`);
+    }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
 }
 
-export async function mapPlaidSecurity(
+/** Map (or unmap, with null assetId) a Plaid position in one account to an asset. */
+export async function mapPlaidPosition(
+  plaidAccountRowId: string,
   securityRowId: string,
   assetId: string | null,
 ): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
+    const plaidAccount = await assertPlaidAccountOwned(userId, plaidAccountRowId);
 
-    const rows = await db
-      .select({ id: plaidSecurities.id, prevAssetId: plaidSecurities.assetId })
+    const securityRows = await db
+      .select({ id: plaidSecurities.id })
       .from(plaidSecurities)
       .where(and(eq(plaidSecurities.userId, userId), eq(plaidSecurities.id, securityRowId)))
       .limit(1);
-    const security = rows[0];
-    if (!security) return { ok: false, error: "security not found" };
+    if (!securityRows[0]) return { ok: false, error: "security not found" };
 
     if (assetId) {
       const visible = await db
@@ -175,45 +184,59 @@ export async function mapPlaidSecurity(
       if (!visible[0]) return { ok: false, error: "asset not found" };
     }
 
-    // Linked app accounts that hold this security — their holdings need re-deriving.
-    const affected = await db
-      .select({ plaidAccountRowId: plaidAccounts.id, accountId: plaidAccounts.accountId })
-      .from(plaidHoldings)
-      .innerJoin(plaidAccounts, eq(plaidHoldings.plaidAccountId, plaidAccounts.id))
+    const prev = await db
+      .select({ assetId: plaidAccountSecurities.assetId })
+      .from(plaidAccountSecurities)
       .where(
-        and(eq(plaidHoldings.plaidSecurityId, securityRowId), isNotNull(plaidAccounts.accountId)),
-      );
+        and(
+          eq(plaidAccountSecurities.plaidAccountId, plaidAccountRowId),
+          eq(plaidAccountSecurities.plaidSecurityId, securityRowId),
+        ),
+      )
+      .limit(1);
+    const prevAssetId = prev[0]?.assetId ?? null;
 
     await db.transaction(async (tx) => {
-      await tx
-        .update(plaidSecurities)
-        .set({ assetId })
-        .where(eq(plaidSecurities.id, securityRowId));
-      const stale = security.prevAssetId ? new Set([security.prevAssetId]) : undefined;
-      for (const a of affected) {
-        if (a.accountId) await applyMappedHoldings(tx, a.plaidAccountRowId, a.accountId, stale);
+      if (assetId) {
+        await tx
+          .insert(plaidAccountSecurities)
+          .values({ plaidAccountId: plaidAccountRowId, plaidSecurityId: securityRowId, assetId })
+          .onConflictDoUpdate({
+            target: [plaidAccountSecurities.plaidAccountId, plaidAccountSecurities.plaidSecurityId],
+            set: { assetId },
+          });
+      } else {
+        await tx
+          .delete(plaidAccountSecurities)
+          .where(
+            and(
+              eq(plaidAccountSecurities.plaidAccountId, plaidAccountRowId),
+              eq(plaidAccountSecurities.plaidSecurityId, securityRowId),
+            ),
+          );
+      }
+      if (plaidAccount.accountId) {
+        const stale = prevAssetId ? new Set([prevAssetId]) : undefined;
+        await applyMappedHoldings(tx, plaidAccountRowId, plaidAccount.accountId, stale);
       }
     });
 
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
-    for (const a of affected) {
-      if (a.accountId) revalidatePath(`/accounts/${a.accountId}`);
-    }
+    if (plaidAccount.accountId) revalidatePath(`/accounts/${plaidAccount.accountId}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
 }
 
-export async function syncPlaidItem(
-  itemId: string,
-): Promise<ActionResult<{ unmappedCount: number }>> {
+export async function syncPlaidItem(itemId: string): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
     await assertPlaidItemOwned(userId, itemId);
-    const unmappedCount = await syncItemInternal(userId, itemId);
+    await syncItemInternal(userId, itemId);
 
+    revalidatePath("/settings");
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
     const linked = await db
@@ -223,7 +246,7 @@ export async function syncPlaidItem(
     for (const row of linked) {
       if (row.accountId) revalidatePath(`/accounts/${row.accountId}`);
     }
-    return { ok: true, data: { unmappedCount } };
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
@@ -240,10 +263,11 @@ export async function removePlaidItem(itemId: string): Promise<ActionResult> {
       // Item may already be dead at Plaid; still remove it locally.
     }
 
-    // Cascade removes plaid_accounts + plaid_holdings. Security mappings and app
-    // holdings are kept — previously synced holdings simply become manual.
+    // Cascade removes plaid_accounts, plaid_holdings, and mappings. App holdings
+    // are kept — previously synced holdings simply become manual.
     await db.delete(plaidItems).where(eq(plaidItems.id, itemId));
 
+    revalidatePath("/settings");
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
     return { ok: true };
@@ -255,10 +279,9 @@ export async function removePlaidItem(itemId: string): Promise<ActionResult> {
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
- * Re-derive app holdings for a linked account from the Plaid snapshot: sum
- * institution values grouped by mapped asset, upsert those holdings, and delete
- * holdings for `staleAssetIds` that are no longer derivable. Holdings for assets
- * never touched by sync are left alone.
+ * Re-derive app holdings for a linked account: sum current snapshot values
+ * grouped by mapped asset, upsert those holdings, and delete holdings for
+ * `staleAssetIds` no longer derivable. Manual holdings are left alone.
  */
 async function applyMappedHoldings(
   tx: Tx,
@@ -268,22 +291,24 @@ async function applyMappedHoldings(
 ) {
   const sums = await tx
     .select({
-      assetId: plaidSecurities.assetId,
+      assetId: plaidAccountSecurities.assetId,
       total: sql<string>`sum(${plaidHoldings.institutionValue})`,
     })
     .from(plaidHoldings)
-    .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-    .where(
-      and(eq(plaidHoldings.plaidAccountId, plaidAccountRowId), isNotNull(plaidSecurities.assetId)),
+    .innerJoin(
+      plaidAccountSecurities,
+      and(
+        eq(plaidAccountSecurities.plaidAccountId, plaidHoldings.plaidAccountId),
+        eq(plaidAccountSecurities.plaidSecurityId, plaidHoldings.plaidSecurityId),
+      ),
     )
-    .groupBy(plaidSecurities.assetId);
+    .where(eq(plaidHoldings.plaidAccountId, plaidAccountRowId))
+    .groupBy(plaidAccountSecurities.assetId);
 
-  const mapped = sums.filter((s): s is { assetId: string; total: string } => s.assetId != null);
-
-  if (mapped.length > 0) {
+  if (sums.length > 0) {
     await tx
       .insert(holdings)
-      .values(mapped.map((s) => ({ accountId, assetId: s.assetId, value: s.total })))
+      .values(sums.map((s) => ({ accountId, assetId: s.assetId, value: s.total })))
       .onConflictDoUpdate({
         target: [holdings.accountId, holdings.assetId],
         set: { value: sql`excluded.value`, updatedAt: new Date() },
@@ -291,7 +316,7 @@ async function applyMappedHoldings(
   }
 
   if (staleAssetIds && staleAssetIds.size > 0) {
-    const current = new Set(mapped.map((s) => s.assetId));
+    const current = new Set(sums.map((s) => s.assetId));
     const toDelete = [...staleAssetIds].filter((id) => !current.has(id));
     if (toDelete.length > 0) {
       await tx
@@ -301,8 +326,8 @@ async function applyMappedHoldings(
   }
 }
 
-/** Fetch holdings from Plaid and refresh snapshots + derived app holdings. Returns unmapped security count. */
-async function syncItemInternal(userId: string, itemId: string): Promise<number> {
+/** Fetch holdings from Plaid and refresh snapshots, auto-mappings, and derived app holdings. */
+async function syncItemInternal(userId: string, itemId: string): Promise<void> {
   const [item] = await db
     .select()
     .from(plaidItems)
@@ -352,15 +377,22 @@ async function syncItemInternal(userId: string, itemId: string): Promise<number>
     accountRowIdByPlaidId.set(a.account_id, row.id);
   }
 
-  // Upsert securities; auto-match by ticker on first insert only, preferring the
-  // user's own asset over a system asset when both share a ticker.
+  // Upsert the user's security catalog (no mapping here — mappings are per account).
   const securityRowIdByPlaidId = new Map<string, string>();
-  const existingSecurities = await db
-    .select({ id: plaidSecurities.id, plaidSecurityId: plaidSecurities.plaidSecurityId })
-    .from(plaidSecurities)
-    .where(eq(plaidSecurities.userId, userId));
-  const existingByPlaidId = new Map(existingSecurities.map((s) => [s.plaidSecurityId, s.id]));
+  for (const s of securities) {
+    const [row] = await db
+      .insert(plaidSecurities)
+      .values({ userId, plaidSecurityId: s.security_id, ticker: s.ticker_symbol, name: s.name })
+      .onConflictDoUpdate({
+        target: [plaidSecurities.userId, plaidSecurities.plaidSecurityId],
+        set: { ticker: s.ticker_symbol, name: s.name },
+      })
+      .returning({ id: plaidSecurities.id });
+    securityRowIdByPlaidId.set(s.security_id, row.id);
+  }
 
+  // Ticker → asset lookup for auto-mapping, preferring the user's own asset
+  // over a system asset when both share a ticker.
   const visibleAssets = await db
     .select({ id: assets.id, ticker: assets.ticker, userId: assets.userId })
     .from(assets)
@@ -370,38 +402,13 @@ async function syncItemInternal(userId: string, itemId: string): Promise<number>
     const key = a.ticker.toUpperCase();
     if (a.userId != null || !assetIdByTicker.has(key)) assetIdByTicker.set(key, a.id);
   }
-
-  for (const s of securities) {
-    const existingId = existingByPlaidId.get(s.security_id);
-    if (existingId) {
-      await db
-        .update(plaidSecurities)
-        .set({ ticker: s.ticker_symbol, name: s.name })
-        .where(eq(plaidSecurities.id, existingId));
-      securityRowIdByPlaidId.set(s.security_id, existingId);
-    } else {
-      const autoAssetId = s.ticker_symbol
-        ? (assetIdByTicker.get(s.ticker_symbol.toUpperCase()) ?? null)
-        : null;
-      const [row] = await db
-        .insert(plaidSecurities)
-        .values({
-          userId,
-          plaidSecurityId: s.security_id,
-          ticker: s.ticker_symbol,
-          name: s.name,
-          assetId: autoAssetId,
-        })
-        .returning({ id: plaidSecurities.id });
-      securityRowIdByPlaidId.set(s.security_id, row.id);
-    }
-  }
-
-  // Group holdings by Plaid account and refresh each snapshot + derived holdings.
+  const tickerBySecurityRowId = new Map<string, string | null>();
   const closePriceBySecurityRowId = new Map<string, number | null>();
   for (const s of securities) {
     const rowId = securityRowIdByPlaidId.get(s.security_id);
-    if (rowId) closePriceBySecurityRowId.set(rowId, s.close_price ?? null);
+    if (!rowId) continue;
+    tickerBySecurityRowId.set(rowId, s.ticker_symbol ?? null);
+    closePriceBySecurityRowId.set(rowId, s.close_price ?? null);
   }
 
   for (const [plaidAccountId, accountRowId] of accountRowIdByPlaidId) {
@@ -430,18 +437,44 @@ async function syncItemInternal(userId: string, itemId: string): Promise<number>
       .limit(1);
 
     await db.transaction(async (tx) => {
-      // Mapped assets derivable from the snapshot BEFORE replacing it — sync owns
-      // (old ∪ new); anything else in the account is manual and untouched.
-      const oldMapped = await tx
-        .selectDistinct({ assetId: plaidSecurities.assetId })
+      // Positions already known for this account — used both to detect
+      // first-seen positions (auto-map candidates) and to compute which mapped
+      // assets sync owned before the refresh.
+      const existingSnapshot = await tx
+        .select({ securityRowId: plaidHoldings.plaidSecurityId })
         .from(plaidHoldings)
-        .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-        .where(
-          and(eq(plaidHoldings.plaidAccountId, accountRowId), isNotNull(plaidSecurities.assetId)),
-        );
-      const staleAssetIds = new Set(
-        oldMapped.map((r) => r.assetId).filter((id): id is string => id != null),
-      );
+        .where(eq(plaidHoldings.plaidAccountId, accountRowId));
+      const existingSecurityIds = new Set(existingSnapshot.map((r) => r.securityRowId));
+
+      const oldMapped = await tx
+        .select({ assetId: plaidAccountSecurities.assetId })
+        .from(plaidAccountSecurities)
+        .innerJoin(
+          plaidHoldings,
+          and(
+            eq(plaidHoldings.plaidAccountId, plaidAccountSecurities.plaidAccountId),
+            eq(plaidHoldings.plaidSecurityId, plaidAccountSecurities.plaidSecurityId),
+          ),
+        )
+        .where(eq(plaidAccountSecurities.plaidAccountId, accountRowId));
+      const staleAssetIds = new Set(oldMapped.map((r) => r.assetId));
+
+      // Auto-map first-seen positions by ticker. Existing positions are never
+      // re-matched, so an explicit unmap sticks.
+      for (const s of snapshot) {
+        if (existingSecurityIds.has(s.securityRowId)) continue;
+        const ticker = tickerBySecurityRowId.get(s.securityRowId);
+        const autoAssetId = ticker ? assetIdByTicker.get(ticker.toUpperCase()) : undefined;
+        if (!autoAssetId) continue;
+        await tx
+          .insert(plaidAccountSecurities)
+          .values({
+            plaidAccountId: accountRowId,
+            plaidSecurityId: s.securityRowId,
+            assetId: autoAssetId,
+          })
+          .onConflictDoNothing();
+      }
 
       const keepIds = snapshot.map((s) => s.securityRowId);
       await tx
@@ -481,25 +514,35 @@ async function syncItemInternal(userId: string, itemId: string): Promise<number>
     });
   }
 
-  // Refresh prices on the user's own assets (system assets are never touched).
-  const mappedSecurities = await db
-    .select({ assetId: plaidSecurities.assetId, plaidSecurityId: plaidSecurities.plaidSecurityId })
-    .from(plaidSecurities)
-    .where(and(eq(plaidSecurities.userId, userId), isNotNull(plaidSecurities.assetId)));
-  const priceByPlaidSecurityId = new Map<string, number>();
-  for (const s of securities) {
-    const price =
-      holdingList.find((h) => h.security_id === s.security_id)?.institution_price ??
-      s.close_price ??
-      null;
-    if (price != null && Number.isFinite(price)) priceByPlaidSecurityId.set(s.security_id, price);
-  }
-  for (const m of mappedSecurities) {
-    const price = priceByPlaidSecurityId.get(m.plaidSecurityId);
-    if (price == null || !m.assetId) continue;
+  // Refresh prices on the user's own mapped assets (system assets are never touched).
+  const mappedAssets = await db
+    .selectDistinct({
+      assetId: plaidAccountSecurities.assetId,
+      securityRowId: plaidAccountSecurities.plaidSecurityId,
+    })
+    .from(plaidAccountSecurities)
+    .innerJoin(plaidAccounts, eq(plaidAccountSecurities.plaidAccountId, plaidAccounts.id))
+    .where(eq(plaidAccounts.itemId, itemId));
+  const priceBySecurityRowId = new Map<string, string>();
+  await db
+    .select({
+      securityRowId: plaidHoldings.plaidSecurityId,
+      price: plaidHoldings.institutionPrice,
+    })
+    .from(plaidHoldings)
+    .innerJoin(plaidAccounts, eq(plaidHoldings.plaidAccountId, plaidAccounts.id))
+    .where(eq(plaidAccounts.itemId, itemId))
+    .then((rows) => {
+      for (const r of rows) {
+        if (r.price != null) priceBySecurityRowId.set(r.securityRowId, r.price);
+      }
+    });
+  for (const m of mappedAssets) {
+    const price = priceBySecurityRowId.get(m.securityRowId);
+    if (price == null) continue;
     await db
       .update(assets)
-      .set({ price: moneyFromNumber(price), priceUpdatedAt: new Date() })
+      .set({ price, priceUpdatedAt: new Date() })
       .where(and(eq(assets.id, m.assetId), eq(assets.userId, userId)));
   }
 
@@ -507,11 +550,4 @@ async function syncItemInternal(userId: string, itemId: string): Promise<number>
     .update(plaidItems)
     .set({ status: "ok", lastErrorCode: null, lastSyncedAt: new Date() })
     .where(eq(plaidItems.id, itemId));
-
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(distinct ${plaidSecurities.id})::int` })
-    .from(plaidSecurities)
-    .innerJoin(plaidHoldings, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-    .where(and(eq(plaidSecurities.userId, userId), isNull(plaidSecurities.assetId)));
-  return count;
 }

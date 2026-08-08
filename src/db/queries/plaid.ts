@@ -1,7 +1,15 @@
-import { and, asc, eq, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../index";
-import { accounts, plaidAccounts, plaidHoldings, plaidItems, plaidSecurities } from "../schema";
+import {
+  accounts,
+  plaidAccountSecurities,
+  plaidAccounts,
+  plaidHoldings,
+  plaidItems,
+  plaidSecurities,
+} from "../schema";
 
+/** Institution connections with their Plaid accounts, for the settings page. */
 export async function listPlaidItemsForUser(userId: string) {
   const items = await db
     .select({
@@ -40,27 +48,14 @@ export async function listPlaidItemsForUser(userId: string) {
   }));
 }
 
-export async function listUnmappedSecuritiesForUser(userId: string) {
-  return db
-    .select({
-      id: plaidSecurities.id,
-      ticker: plaidSecurities.ticker,
-      name: plaidSecurities.name,
-      totalValue: sql<string>`sum(${plaidHoldings.institutionValue})`,
-      accountCount: sql<number>`count(distinct ${plaidHoldings.plaidAccountId})::int`,
-    })
-    .from(plaidSecurities)
-    .innerJoin(plaidHoldings, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-    .where(and(eq(plaidSecurities.userId, userId), isNull(plaidSecurities.assetId)))
-    .groupBy(plaidSecurities.id)
-    .orderBy(asc(plaidSecurities.ticker), asc(plaidSecurities.name));
-}
-
+/** The Plaid connection feeding an app account, or null. */
 export async function getPlaidLinkForAccount(userId: string, accountId: string) {
   const rows = await db
     .select({
       itemId: plaidItems.id,
-      plaidAccountId: plaidAccounts.id,
+      plaidAccountRowId: plaidAccounts.id,
+      plaidAccountName: plaidAccounts.name,
+      mask: plaidAccounts.mask,
       institutionName: plaidItems.institutionName,
       status: plaidItems.status,
       lastSyncedAt: plaidItems.lastSyncedAt,
@@ -69,40 +64,79 @@ export async function getPlaidLinkForAccount(userId: string, accountId: string) 
     .innerJoin(plaidItems, eq(plaidAccounts.itemId, plaidItems.id))
     .where(and(eq(plaidItems.userId, userId), eq(plaidAccounts.accountId, accountId)))
     .limit(1);
-  const link = rows[0];
-  if (!link) return null;
-
-  const [{ unmappedValue }] = await db
-    .select({ unmappedValue: sql<string | null>`sum(${plaidHoldings.institutionValue})` })
-    .from(plaidHoldings)
-    .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-    .where(
-      and(eq(plaidHoldings.plaidAccountId, link.plaidAccountId), isNull(plaidSecurities.assetId)),
-    );
-
-  return { ...link, unmappedValue };
+  return rows[0] ?? null;
 }
 
-/** Asset ids whose holdings in this app account are managed by Plaid sync. */
+/** Current positions in a Plaid account that have no mapping yet. */
+export async function listUnmappedPositionsForPlaidAccount(plaidAccountRowId: string) {
+  return db
+    .select({
+      securityRowId: plaidSecurities.id,
+      ticker: plaidSecurities.ticker,
+      name: plaidSecurities.name,
+      value: plaidHoldings.institutionValue,
+    })
+    .from(plaidHoldings)
+    .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
+    .leftJoin(
+      plaidAccountSecurities,
+      and(
+        eq(plaidAccountSecurities.plaidAccountId, plaidHoldings.plaidAccountId),
+        eq(plaidAccountSecurities.plaidSecurityId, plaidHoldings.plaidSecurityId),
+      ),
+    )
+    .where(
+      and(eq(plaidHoldings.plaidAccountId, plaidAccountRowId), isNull(plaidAccountSecurities.id)),
+    )
+    .orderBy(asc(plaidSecurities.ticker), asc(plaidSecurities.name));
+}
+
+/** Total value of current unmapped positions in a Plaid account. */
+export async function getUnmappedValueForPlaidAccount(plaidAccountRowId: string) {
+  const [{ total }] = await db
+    .select({ total: sql<string | null>`sum(${plaidHoldings.institutionValue})` })
+    .from(plaidHoldings)
+    .leftJoin(
+      plaidAccountSecurities,
+      and(
+        eq(plaidAccountSecurities.plaidAccountId, plaidHoldings.plaidAccountId),
+        eq(plaidAccountSecurities.plaidSecurityId, plaidHoldings.plaidSecurityId),
+      ),
+    )
+    .where(
+      and(eq(plaidHoldings.plaidAccountId, plaidAccountRowId), isNull(plaidAccountSecurities.id)),
+    );
+  return total;
+}
+
+/** Asset ids whose holdings in this app account are managed by Plaid sync (current positions only). */
 export async function getPlaidManagedAssetIdsForAccount(accountId: string): Promise<string[]> {
   const rows = await db
-    .selectDistinct({ assetId: plaidSecurities.assetId })
-    .from(plaidHoldings)
-    .innerJoin(plaidAccounts, eq(plaidHoldings.plaidAccountId, plaidAccounts.id))
-    .innerJoin(plaidSecurities, eq(plaidHoldings.plaidSecurityId, plaidSecurities.id))
-    .where(and(eq(plaidAccounts.accountId, accountId), isNotNull(plaidSecurities.assetId)));
-  return rows.map((r) => r.assetId).filter((id): id is string => id != null);
+    .selectDistinct({ assetId: plaidAccountSecurities.assetId })
+    .from(plaidAccountSecurities)
+    .innerJoin(plaidAccounts, eq(plaidAccountSecurities.plaidAccountId, plaidAccounts.id))
+    .innerJoin(
+      plaidHoldings,
+      and(
+        eq(plaidHoldings.plaidAccountId, plaidAccountSecurities.plaidAccountId),
+        eq(plaidHoldings.plaidSecurityId, plaidAccountSecurities.plaidSecurityId),
+      ),
+    )
+    .where(eq(plaidAccounts.accountId, accountId));
+  return rows.map((r) => r.assetId);
 }
 
-/** App accounts not yet linked to any Plaid account, for the link dropdown. */
-export async function listLinkableAccounts(userId: string) {
-  const linked = db
-    .select({ accountId: plaidAccounts.accountId })
-    .from(plaidAccounts)
-    .where(isNotNull(plaidAccounts.accountId));
+/** Plaid accounts not yet linked to any app account, for the account-detail link dropdown. */
+export async function listUnlinkedPlaidAccounts(userId: string) {
   return db
-    .select({ id: accounts.id, name: accounts.name })
-    .from(accounts)
-    .where(and(eq(accounts.userId, userId), notInArray(accounts.id, linked)))
-    .orderBy(asc(accounts.sortOrder), asc(accounts.createdAt));
+    .select({
+      id: plaidAccounts.id,
+      name: plaidAccounts.name,
+      mask: plaidAccounts.mask,
+      institutionName: plaidItems.institutionName,
+    })
+    .from(plaidAccounts)
+    .innerJoin(plaidItems, eq(plaidAccounts.itemId, plaidItems.id))
+    .where(and(eq(plaidItems.userId, userId), isNull(plaidAccounts.accountId)))
+    .orderBy(asc(plaidItems.institutionName), asc(plaidAccounts.name));
 }

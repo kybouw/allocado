@@ -189,8 +189,6 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             question you can answer: are you invested the way you meant to be?
           </p>
         )}
-
-        <HorizonNote years={years} duration={duration} />
       </section>
 
       {/* ---------- What you have ---------- */}
@@ -213,6 +211,13 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             </p>
           </>
         )}
+
+        {/*
+          Duration is measured from the holdings, so this is a verdict on what you
+          actually hold — not on the target you picked. The target date only supplies
+          the yardstick.
+        */}
+        <HorizonNote years={years} duration={duration} />
       </section>
 
       {/* ---------- Where it lives ---------- */}

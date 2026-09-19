@@ -57,7 +57,12 @@ export function SortableCardList({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      id="sortable-card-list"
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
       <SortableContext
         items={optimisticItems.map((it) => it.id)}
         strategy={verticalListSortingStrategy}

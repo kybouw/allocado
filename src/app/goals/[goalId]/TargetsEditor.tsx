@@ -219,6 +219,20 @@ export function TargetsEditor({
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-avocado-700">Presets</span>
+        {PRESETS.map(({ label, stock, bond }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => applyPreset(stock, bond)}
+            className="rounded-full border border-avocado-300 px-3 py-1 text-xs font-medium text-avocado-700 transition hover:bg-avocado-50"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-6 rounded-lg bg-avocado-50 px-4 py-3">
         <span className="text-xs font-medium text-avocado-700">Include</span>
         {CLASSES.map((key) => (
@@ -234,20 +248,6 @@ export function TargetsEditor({
               {CLASS_LABEL[key]}
             </label>
           </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-avocado-700">Presets</span>
-        {PRESETS.map(({ label, stock, bond }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => applyPreset(stock, bond)}
-            className="rounded-full border border-avocado-300 px-3 py-1 text-xs font-medium text-avocado-700 transition hover:bg-avocado-50"
-          >
-            {label}
-          </button>
         ))}
       </div>
 

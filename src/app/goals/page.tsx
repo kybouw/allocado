@@ -35,7 +35,6 @@ export default async function GoalsPage() {
                 goal={card.goal}
                 total={card.total}
                 targeted={card.targeted}
-                duration={card.duration}
                 accountCount={card.accountCount}
                 accountBreakdowns={card.accountBreakdowns}
                 hasHoldings={card.hasHoldings}

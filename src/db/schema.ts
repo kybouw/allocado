@@ -49,6 +49,8 @@ export const accounts = pgTable(
     name: text("name").notNull(),
     institution: text("institution"),
     accountType: accountTypeEnum("account_type").notNull(),
+    /** Balance this account is required to hold in cash (HSA debit-card floors, etc). Null = no requirement. */
+    minimumCashBalance: numeric("minimum_cash_balance", { precision: 14, scale: 2 }),
     notes: text("notes"),
     sortOrder: integer("sort_order").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -142,7 +144,6 @@ export const allocationTargets = pgTable(
     stockTargetPct: numeric("stock_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     bondTargetPct: numeric("bond_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     cashTargetPct: numeric("cash_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
-    otherTargetPct: numeric("other_target_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     effectiveDate: date("effective_date"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -150,7 +151,7 @@ export const allocationTargets = pgTable(
     unique("targets_goal_date_unique").on(t.goalId, t.effectiveDate).nullsNotDistinct(),
     check(
       "targets_type_pct_sum",
-      sql`${t.stockTargetPct} + ${t.bondTargetPct} + ${t.cashTargetPct} + ${t.otherTargetPct} = 100`,
+      sql`${t.stockTargetPct} + ${t.bondTargetPct} + ${t.cashTargetPct} = 100`,
     ),
   ],
 );

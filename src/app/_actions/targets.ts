@@ -21,7 +21,6 @@ export type TargetInput = {
   stockTargetPct: number;
   bondTargetPct: number;
   cashTargetPct: number;
-  otherTargetPct: number;
   effectiveDate: string | null;
 };
 
@@ -33,8 +32,7 @@ export async function setStaticTargets(goalId: string, input: TargetInput): Prom
     const userId = await requireUserId();
     await assertGoalOwned(userId, goalId);
 
-    const sum =
-      input.stockTargetPct + input.bondTargetPct + input.cashTargetPct + input.otherTargetPct;
+    const sum = input.stockTargetPct + input.bondTargetPct + input.cashTargetPct;
     if (Math.round(sum * 100) !== 10000) {
       return { ok: false, error: `Targets must sum to 100% (got ${sum.toFixed(2)}%)` };
     }
@@ -48,7 +46,6 @@ export async function setStaticTargets(goalId: string, input: TargetInput): Prom
         stockTargetPct: input.stockTargetPct.toFixed(2),
         bondTargetPct: input.bondTargetPct.toFixed(2),
         cashTargetPct: input.cashTargetPct.toFixed(2),
-        otherTargetPct: input.otherTargetPct.toFixed(2),
         effectiveDate: null,
       });
     });

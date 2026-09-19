@@ -23,7 +23,10 @@ asset_class_type: stock | bond | cash | other
 - `id`, `user_id`, `name`, `target_date` (nullable), `notes`, `sort_order`, `created_at`
 
 **`accounts`** — brokerage/investment accounts, each assigned to one goal
-- `id`, `user_id`, `goal_id` → goals, `name`, `institution`, `account_type`, `notes`, `created_at`
+- `id`, `user_id`, `goal_id` → goals, `name`, `institution`, `account_type`, `minimum_cash_balance`, `notes`, `created_at`
+- `minimum_cash_balance` is cash the account forces you to hold (an HSA debit-card floor, for
+  example). Null = no requirement; 0 = an explicit zero. Nothing consumes it yet — it exists so
+  that rebalancing suggestions can eventually avoid proposing sales you are not free to make.
 
 **`asset_classes`** — categories like "US Stocks", "Short-Term Bonds", "Cash"
 - `id`, `user_id` (null = system default), `name`, `type` (asset_class_type), `avg_duration_years` (for bond classes), `created_at`
@@ -42,16 +45,24 @@ asset_class_type: stock | bond | cash | other
 - `value` is the source of truth. `shares` is optional — useful when price is known.
 
 **`allocation_targets`** — target % per asset class per goal
-- `id`, `goal_id` → goals, `asset_class_id` → asset_classes, `target_pct` (0–100), `effective_date` (null = always active; dated rows = glide path), `created_at`
+- `id`, `goal_id` → goals, `stock_target_pct`, `bond_target_pct`, `cash_target_pct` (each 0–100, checked to sum to exactly 100), `effective_date` (null = always active; dated rows = glide path), `created_at`
 - Active target = most recent `effective_date ≤ today`, or the null row if no dated rows exist.
-- Targets are set at the **aggregate level only** (Stocks / Bonds / Cash). "Other" never has a target — it is informational only.
+- Targets are set at the **aggregate level only** (Stocks / Bonds / Cash). There is deliberately no
+  column for "Other": gold, crypto and commodities share no position on a risk scale, so a target
+  percentage for the bucket cannot mean anything and no return history can be attached to it.
+  In code this is `AllocationSlice.target === null` for Other, which renders as "—" rather than as
+  a 0% target it is drifting from.
 
 ### Key derivations
 
 - **Goal total value** = SUM(holdings.value) across all accounts assigned to that goal
 - **Current allocation %** = SUM(holdings.value × asset_class_allocations.ratio / 100) per asset class ÷ goal total
 - **Drift** = current % − target %
-- **Weighted avg bond duration** = SUM(holdings.value × assets.avg_duration_years) ÷ SUM(holdings.value for bond-tagged assets)
+- **Weighted avg bond duration** = SUM(bond dollars × assets.avg_duration_years) ÷ SUM(bond dollars),
+  where a holding's bond dollars = `holdings.value × assets.bond_pct / 100`. Both sums cover the
+  bond sleeve only, so the result is comparable to a time horizon. Dividing by the whole goal
+  would blend in stocks and cash, which have no duration, and give a figure that shrinks as the
+  rest of the goal grows.
 
 ---
 
@@ -86,13 +97,15 @@ asset_class_type: stock | bond | cash | other
 
 ## Domain Notes
 
-**Bond duration.** For medium/short-term goals, weighted average bond duration should stay below the time horizon. The app surfaces this on the dashboard per-goal.
+**Bond duration.** For medium/short-term goals, weighted average bond duration should stay below the time horizon — roughly, a rate shock should have time to wash out before you spend the money. The goal detail page states this as a verdict in the "What you have" section, since duration is measured from the holdings rather than from the target.
 
 **Multi-class assets.** Funds can hold multiple asset classes. Allocation is computed by rolling holdings through the `asset_class_allocations` ratio table. Tags across independent dimensions (region, cap size, duration, tax treatment) do not need to sum to 100% collectively — only within a single dimension.
 
 **Aggregate vs granular classes.** Goal targets and dashboard display use only four aggregate classes (Stocks, Bonds, Cash, Other). Granular classes (US Stocks, Large-Cap, Short-Term Bonds, etc.) are available for future per-class analysis but are not surfaced in the MVP dashboard.
 
-**"Other" class.** Covers assets that are not stocks, bonds, or cash equivalents (e.g., crypto, gold, commodities). Never has a target allocation. Shown on the dashboard only when current exposure > 0.
+**"Other" class.** Covers assets that are not stocks, bonds, or cash equivalents (e.g., crypto, gold, commodities). Never has a target allocation — the app reports what you hold without forming an opinion about it. Shown on the dashboard only when current exposure > 0.
+
+**Per-account drift is meaningless.** A goal's target describes the goal, not any one account inside it. Holding bonds in a traditional IRA and stocks in a Roth is a deliberate tax strategy that makes each account individually lopsided while the goal stays exactly on target, so account breakdowns show current allocation only and carry no target.
 
 **System defaults.** Assets and asset classes with `user_id = NULL` are the shared library. Users can create their own. UI shows system defaults first when adding holdings.
 

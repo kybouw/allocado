@@ -13,7 +13,7 @@ export function AllocationBars({
   goalId: string;
 }) {
   const other = targeted.find((b) => b.name === "Other");
-  const showOther = (other?.current ?? 0) > 0.001 || (other?.target ?? 0) > 0.001;
+  const showOther = (other?.current ?? 0) > 0.001;
   const visibleSlices = showOther ? targeted : targeted.filter((b) => b.name !== "Other");
   const colClass = showOther ? "grid-cols-4" : "grid-cols-3";
   const tableWidth = showOther ? "w-64" : "w-52";
@@ -25,7 +25,7 @@ export function AllocationBars({
   }));
   const targetSlices = visibleSlices.map((b) => ({
     key: b.name,
-    pct: b.target,
+    pct: b.target ?? 0,
     colorClass: TYPE_COLORS[b.name],
   }));
 
@@ -83,7 +83,7 @@ export function AllocationBars({
         <div className={`${ROW_H} grid ${colClass} items-center text-center text-sm`}>
           {visibleSlices.map((b) => (
             <span key={b.name} className="text-avocado-600">
-              {hasTargets ? formatPercent(b.target) : "—"}
+              {hasTargets && b.target != null ? formatPercent(b.target) : "—"}
             </span>
           ))}
         </div>
@@ -91,6 +91,13 @@ export function AllocationBars({
         {hasTargets && (
           <div className={`${ROW_H} grid ${colClass} items-center text-center text-sm`}>
             {visibleSlices.map((b) => {
+              if (b.target == null) {
+                return (
+                  <span key={b.name} className="text-avocado-500">
+                    —
+                  </span>
+                );
+              }
               const drift = b.current - b.target;
               return (
                 <span

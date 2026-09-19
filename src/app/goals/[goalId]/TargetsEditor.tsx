@@ -7,7 +7,6 @@ type InitialTargets = {
   stockTargetPct: number;
   bondTargetPct: number;
   cashTargetPct: number;
-  otherTargetPct: number;
 };
 
 export function TargetsEditor({
@@ -20,11 +19,10 @@ export function TargetsEditor({
   const [stock, setStock] = useState(initialTargets.stockTargetPct);
   const [bond, setBond] = useState(initialTargets.bondTargetPct);
   const [cash, setCash] = useState(initialTargets.cashTargetPct);
-  const [other, setOther] = useState(initialTargets.otherTargetPct);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const sum = stock + bond + cash + other;
+  const sum = stock + bond + cash;
   const sumOk = Math.round(sum * 100) === 10000;
 
   function save() {
@@ -35,7 +33,6 @@ export function TargetsEditor({
         stockTargetPct: stock,
         bondTargetPct: bond,
         cashTargetPct: cash,
-        otherTargetPct: other,
         effectiveDate: null,
       });
       setFeedback(res.ok ? "Saved." : `Error: ${res.error}`);
@@ -44,13 +41,12 @@ export function TargetsEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {(
           [
             { label: "Stocks", value: stock, set: setStock },
             { label: "Bonds", value: bond, set: setBond },
             { label: "Cash", value: cash, set: setCash },
-            { label: "Other", value: other, set: setOther },
           ] as const
         ).map(({ label, value, set }) => (
           <div key={label} className="flex flex-col gap-1">

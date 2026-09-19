@@ -16,13 +16,14 @@ export type AssetTypeRow = {
 export type AssetRow = {
   id: string;
   avgDurationYears: string | null;
+  /** Share of the asset that is bonds (0-100). Weights the duration average. */
+  bondPct: string;
 };
 
 export type TargetRow = {
   stockTargetPct: string;
   bondTargetPct: string;
   cashTargetPct: string;
-  otherTargetPct: string;
   effectiveDate: string | null;
 };
 
@@ -83,45 +84,149 @@ export function computeTypeFractions(
 export function resolveActiveTargets(
   targets: TargetRow[],
   asOf: Date = new Date(),
-): { stock: number; bond: number; cash: number; other: number } {
+): { stock: number; bond: number; cash: number } {
   const asOfStr = asOf.toISOString().slice(0, 10);
   const dated = targets
     .filter((r) => r.effectiveDate != null && r.effectiveDate <= asOfStr)
     // biome-ignore lint/style/noNonNullAssertion: filtered to non-null above
     .sort((a, b) => (a.effectiveDate! < b.effectiveDate! ? 1 : -1));
   const pick = dated[0] ?? targets.find((r) => r.effectiveDate == null);
-  if (!pick) return { stock: 0, bond: 0, cash: 0, other: 0 };
+  if (!pick) return { stock: 0, bond: 0, cash: 0 };
   return {
     stock: Number(pick.stockTargetPct) / 100,
     bond: Number(pick.bondTargetPct) / 100,
     cash: Number(pick.cashTargetPct) / 100,
-    other: Number(pick.otherTargetPct) / 100,
   };
 }
 
 /**
- * Weighted average duration across all of a goal's holdings.
- * Bonds use their avgDurationYears; cash and equity count as 0.
- * Weight = holding value. Returns null when no bond exposure exists.
+ * Weighted average duration of a goal's BOND SLEEVE.
+ *
+ * Both sums are over bond dollars only, so the result answers "how rate-sensitive
+ * are the bonds I hold?" and is directly comparable to a time horizon. Dividing by
+ * the whole portfolio instead would blend in stocks and cash, which have no duration,
+ * and report a number that falls as the rest of the goal grows — a goal that is 20%
+ * bonds at 5 years would read 1.0, which is not the duration of anything.
+ *
+ * A fund that is only partly bonds contributes just its bond portion: a balanced fund
+ * tagged 40% bonds at duration 6 brings 0.4 x value of bond dollars, not its full value.
+ *
+ * Returns null when the goal holds no bonds with a known duration.
  */
 export function computeWeightedBondDuration(
   holdings: HoldingRow[],
   assets: AssetRow[],
 ): number | null {
-  const byId = new Map(assets.map((a) => [a.id, a.avgDurationYears] as const));
+  const byId = new Map(assets.map((a) => [a.id, a] as const));
   let weightedSum = 0;
-  let totalValue = 0;
-  let hasBonds = false;
+  let bondValue = 0;
+
   for (const h of holdings) {
     const v = Number(h.value);
     if (!Number.isFinite(v) || v <= 0) continue;
-    totalValue += v;
-    const dur = byId.get(h.assetId);
-    if (dur == null) continue;
-    const d = Number(dur);
-    if (!Number.isFinite(d) || d === 0) continue;
-    weightedSum += d * v;
-    hasBonds = true;
+
+    const asset = byId.get(h.assetId);
+    if (!asset) continue;
+
+    const d = Number(asset.avgDurationYears);
+    if (!Number.isFinite(d) || d <= 0) continue;
+
+    const bondShare = Number(asset.bondPct) / 100;
+    if (!Number.isFinite(bondShare) || bondShare <= 0) continue;
+
+    const dollars = v * bondShare;
+    weightedSum += d * dollars;
+    bondValue += dollars;
   }
-  return hasBonds && totalValue > 0 ? weightedSum / totalValue : null;
+
+  return bondValue > 0 ? weightedSum / bondValue : null;
+}
+
+export type ProvenanceHolding = {
+  accountId: string;
+  assetId: string;
+  ticker: string;
+  assetName: string;
+  value: string;
+};
+
+export type ProvenanceEntry = {
+  accountId: string;
+  assetId: string;
+  ticker: string;
+  assetName: string;
+  /** Dollars this holding contributes to this asset class, after its class ratio. */
+  dollars: number;
+  /** Share of the class this holding accounts for (0..1). */
+  shareOfClass: number;
+};
+
+/**
+ * Break each asset class down into the holdings that produced it.
+ *
+ * A fund tagged 60% stocks / 40% bonds contributes to both, so one holding can
+ * appear under more than one class with a different dollar amount each time —
+ * which is exactly the question "where did this cash come from?" needs answered.
+ */
+export function computeTypeProvenance(
+  holdings: ProvenanceHolding[],
+  assetTypes: AssetTypeRow[],
+): Map<AssetType, ProvenanceEntry[]> {
+  const byId = new Map(assetTypes.map((a) => [a.id, a]));
+  const out = new Map<AssetType, ProvenanceEntry[]>([
+    ["stock", []],
+    ["bond", []],
+    ["cash", []],
+    ["other", []],
+  ]);
+
+  for (const h of holdings) {
+    const value = Number(h.value);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const a = byId.get(h.assetId);
+    if (!a) continue;
+
+    const ratios: Array<[AssetType, string]> = [
+      ["stock", a.stockPct],
+      ["bond", a.bondPct],
+      ["cash", a.cashPct],
+      ["other", a.otherPct],
+    ];
+
+    for (const [type, pct] of ratios) {
+      const dollars = value * (Number(pct) / 100);
+      if (!Number.isFinite(dollars) || dollars <= 0.005) continue;
+      out.get(type)?.push({
+        accountId: h.accountId,
+        assetId: h.assetId,
+        ticker: h.ticker,
+        assetName: h.assetName,
+        dollars,
+        shareOfClass: 0,
+      });
+    }
+  }
+
+  // Second pass: shares are only knowable once each class total is known.
+  for (const [, entries] of out) {
+    const classTotal = entries.reduce((acc, e) => acc + e.dollars, 0);
+    for (const e of entries) {
+      e.shareOfClass = classTotal > 0 ? e.dollars / classTotal : 0;
+    }
+    entries.sort((a, b) => b.dollars - a.dollars);
+  }
+
+  return out;
+}
+
+/**
+ * Whole years from today until a goal's target date. Null when undated,
+ * clamped at zero for dates that have already passed.
+ */
+export function yearsUntil(targetDate: string | null, asOf: Date = new Date()): number | null {
+  if (!targetDate) return null;
+  const target = new Date(`${targetDate}T00:00:00Z`);
+  if (Number.isNaN(target.getTime())) return null;
+  const ms = target.getTime() - asOf.getTime();
+  return Math.max(0, ms / (1000 * 60 * 60 * 24 * 365.25));
 }

@@ -67,6 +67,7 @@ export default async function AccountsPage() {
                       goalId: account.goalId,
                       accountType: account.accountType,
                       institution: account.institution,
+                      minimumCashBalance: account.minimumCashBalance,
                       notes: account.notes,
                     }}
                   />

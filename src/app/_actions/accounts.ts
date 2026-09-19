@@ -10,6 +10,18 @@ import { revalidatePath } from "next/cache";
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
+/**
+ * Parse the optional "required cash floor" field. Empty means no requirement (null);
+ * a number means that much cash is committed and not free to rebalance.
+ */
+function parseMinimumCashBalance(raw: FormDataEntryValue | null): string | null | undefined {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+  const n = Number(text);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return n.toFixed(2);
+}
+
 export async function createAccount(formData: FormData): Promise<ActionResult<{ id: string }>> {
   try {
     const userId = await requireUserId();
@@ -18,11 +30,14 @@ export async function createAccount(formData: FormData): Promise<ActionResult<{ 
     const institution = String(formData.get("institution") ?? "").trim() || null;
     const accountType = String(formData.get("accountType") ?? "") as AccountType;
     const notes = String(formData.get("notes") ?? "").trim() || null;
+    const minimumCashBalance = parseMinimumCashBalance(formData.get("minimumCashBalance"));
 
     if (!name) return { ok: false, error: "Name is required" };
     if (!goalId) return { ok: false, error: "Goal is required" };
     if (!ACCOUNT_TYPE_VALUES.includes(accountType))
       return { ok: false, error: "Invalid account type" };
+    if (minimumCashBalance === undefined)
+      return { ok: false, error: "Required cash balance must be a positive dollar amount" };
 
     const goal = await db
       .select({ id: goals.id })
@@ -35,7 +50,16 @@ export async function createAccount(formData: FormData): Promise<ActionResult<{ 
 
     const [row] = await db
       .insert(accounts)
-      .values({ userId, goalId, name, institution, accountType, notes, sortOrder })
+      .values({
+        userId,
+        goalId,
+        name,
+        institution,
+        accountType,
+        minimumCashBalance,
+        notes,
+        sortOrder,
+      })
       .returning({ id: accounts.id });
 
     revalidatePath("/accounts");
@@ -55,14 +79,17 @@ export async function updateAccount(accountId: string, formData: FormData): Prom
     const institution = String(formData.get("institution") ?? "").trim() || null;
     const accountType = String(formData.get("accountType") ?? "") as AccountType;
     const notes = String(formData.get("notes") ?? "").trim() || null;
+    const minimumCashBalance = parseMinimumCashBalance(formData.get("minimumCashBalance"));
 
     if (!name) return { ok: false, error: "Name is required" };
     if (!ACCOUNT_TYPE_VALUES.includes(accountType))
       return { ok: false, error: "Invalid account type" };
+    if (minimumCashBalance === undefined)
+      return { ok: false, error: "Required cash balance must be a positive dollar amount" };
 
     await db
       .update(accounts)
-      .set({ name, goalId, institution, accountType, notes })
+      .set({ name, goalId, institution, accountType, minimumCashBalance, notes })
       .where(and(eq(accounts.userId, userId), eq(accounts.id, accountId)));
 
     revalidatePath("/accounts");

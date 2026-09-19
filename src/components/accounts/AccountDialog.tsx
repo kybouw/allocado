@@ -1,0 +1,149 @@
+"use client";
+
+import { updateAccount } from "@allocado/app/_actions/accounts";
+import {
+  type AccountPlaidLink,
+  AccountSyncCard,
+  type PlaidPosition,
+} from "@allocado/components/plaid/AccountSyncCard";
+import { Button } from "@allocado/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@allocado/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@allocado/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@allocado/components/ui/tooltip";
+import { Loader2, Pencil } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { type AccountFormValues, AccountGeneralForm } from "./AccountGeneralForm";
+
+/**
+ * Everything you can change about an account, in one dialog over the detail page.
+ *
+ * The three tabs are deliberately not symmetric: General is a form with its own
+ * Save, holdings save themselves through HoldingsEditor, and the sync controls
+ * fire as soon as you touch them. So the dialog has no shared footer Save — each
+ * tab keeps the save affordance it already had, and nothing implies that
+ * switching tabs preserves unsaved work.
+ */
+export function AccountDialog({
+  account,
+  goals,
+  sync,
+  holdingsEditor,
+}: {
+  account: AccountFormValues;
+  goals: Array<{ id: string; name: string }>;
+  sync: {
+    accountId: string;
+    link: AccountPlaidLink | null;
+    unlinkedPlaidAccounts: Array<{
+      id: string;
+      name: string;
+      mask: string | null;
+      institutionName: string | null;
+    }>;
+    positions: PlaidPosition[];
+    assets: Array<{ id: string; ticker: string; name: string }>;
+  };
+  holdingsEditor: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  // AccountSyncCard renders nothing when there is no link and nothing to link.
+  // That is fine as a hidden card, but an empty tab is not — so drop the tab.
+  const showSync = sync.link != null || sync.unlinkedPlaidAccounts.length > 0;
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await updateAccount(account.id, formData);
+      if (res.ok) toast.success("Account updated.");
+      else toast.error(res.error ?? "Something went wrong.");
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!isPending) setOpen(v);
+      }}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Edit account">
+              <Pencil className="size-4" />
+            </Button>
+          </DialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Edit account</TooltipContent>
+      </Tooltip>
+
+      {/*
+        Width and height are both pinned to small-viewport units rather than to
+        percentages of a containing block, so the dialog behaves the same on a phone
+        as on a desktop and does not resize when mobile browser chrome slides away.
+      */}
+      <DialogContent className="grid-rows-[auto_1fr] h-[min(560px,85svh)] max-sm:max-w-[calc(100svw-2rem)] sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{account.name}</DialogTitle>
+        </DialogHeader>
+
+        <Tabs defaultValue="general" className="flex min-h-0 flex-col">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            {showSync && <TabsTrigger value="sync">Automatic sync</TabsTrigger>}
+          </TabsList>
+
+          {/*
+            The dialog's own height is fixed, and each panel flexes to fill whatever is
+            left, so switching tabs never resizes the window — only the contents change.
+            Panels scroll individually, which also keeps the tab bar in place.
+
+            svh rather than vh so mobile browser chrome sliding in and out does not
+            change the height mid-use, and the 560px cap keeps it from becoming a
+            full-screen sheet on a tall phone.
+          */}
+          <TabsContent value="general" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AccountGeneralForm account={account} goals={goals} idPrefix="account-dialog" />
+              <div className="sm:col-span-2">
+                <Button type="submit" disabled={isPending}>
+                  {isPending && <Loader2 className="size-4 animate-spin" />}
+                  Save
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="holdings" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
+            {holdingsEditor}
+          </TabsContent>
+
+          {showSync && (
+            <TabsContent value="sync" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
+              <AccountSyncCard
+                accountId={sync.accountId}
+                link={sync.link}
+                unlinkedPlaidAccounts={sync.unlinkedPlaidAccounts}
+                positions={sync.positions}
+                assets={sync.assets}
+                variant="plain"
+              />
+            </TabsContent>
+          )}
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}

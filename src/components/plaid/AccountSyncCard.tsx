@@ -44,6 +44,7 @@ export function AccountSyncCard({
   unlinkedPlaidAccounts,
   positions,
   assets,
+  variant = "card",
 }: {
   accountId: string;
   link: AccountPlaidLink | null;
@@ -55,9 +56,18 @@ export function AccountSyncCard({
   }>;
   positions: PlaidPosition[];
   assets: Array<{ id: string; ticker: string; name: string }>;
+  /**
+   * "card" is the standalone section with its own border and heading.
+   * "plain" drops both, for when a container already provides them — the
+   * account dialog's Automatic sync tab, which would otherwise show a card
+   * inside a panel under a duplicate title.
+   */
+  variant?: "card" | "plain";
 }) {
   const [selected, setSelected] = useState("");
   const [isPending, startTransition] = useTransition();
+  const isPlain = variant === "plain";
+  const sectionClass = isPlain ? "flex flex-col" : "card flex flex-col";
 
   function setLink(plaidAccountRowId: string, target: string | null) {
     startTransition(async () => {
@@ -78,8 +88,8 @@ export function AccountSyncCard({
   if (!link) {
     if (unlinkedPlaidAccounts.length === 0) return null;
     return (
-      <section className="card flex flex-col gap-3">
-        <h2 className="text-lg font-medium text-avocado-800">Automatic sync</h2>
+      <section className={`${sectionClass} gap-3`}>
+        {!isPlain && <h2 className="text-lg font-medium text-avocado-800">Automatic sync</h2>}
         <p className="text-sm text-avocado-700">
           Feed this account from a connected brokerage account. Manage institutions in{" "}
           <Link href="/settings" className="underline">
@@ -116,10 +126,10 @@ export function AccountSyncCard({
   }
 
   return (
-    <section className="card flex flex-col gap-4">
+    <section className={`${sectionClass} gap-4`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-medium text-avocado-800">Automatic sync</h2>
+          {!isPlain && <h2 className="text-lg font-medium text-avocado-800">Automatic sync</h2>}
           {link.status === "ok" ? (
             <Badge variant="secondary">Connected</Badge>
           ) : (

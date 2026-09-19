@@ -88,23 +88,21 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
   // Current allocation only. A goal's target describes the goal, not any one
   // account inside it — placing bonds and stocks by tax treatment makes each
   // account deliberately lopsided (KB-34).
-  const accountBreakdowns: AccountBreakdown[] = accountsInGoal
-    .filter((a) => holdingsByAccount.has(a.id))
-    .map((acct) => {
-      const acctHoldings = holdingsByAccount.get(acct.id) ?? [];
-      const acctTotal = computeGoalTotal(acctHoldings);
-      const acctCurrent = computeTypeFractions(computeTypeDollars(acctHoldings, assets), acctTotal);
-      return {
-        accountId: acct.id,
-        accountName: acct.name,
-        accountType: acct.accountType,
-        total: acctTotal,
-        slices: ALL_TYPE_KEYS.map((key) => ({
-          name: TYPE_DISPLAY[key],
-          current: acctCurrent.get(key) ?? 0,
-        })),
-      };
-    });
+  const accountBreakdowns: AccountBreakdown[] = accountsInGoal.map((acct) => {
+    const acctHoldings = holdingsByAccount.get(acct.id) ?? [];
+    const acctTotal = computeGoalTotal(acctHoldings);
+    const acctCurrent = computeTypeFractions(computeTypeDollars(acctHoldings, assets), acctTotal);
+    return {
+      accountId: acct.id,
+      accountName: acct.name,
+      accountType: acct.accountType,
+      total: acctTotal,
+      slices: ALL_TYPE_KEYS.map((key) => ({
+        name: TYPE_DISPLAY[key],
+        current: acctCurrent.get(key) ?? 0,
+      })),
+    };
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -242,30 +240,12 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
           </p>
         ) : (
           <>
-            <ul className="divide-y divide-avocado-100">
-              {accountsInGoal.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-4 py-3">
-                  <Link
-                    href={`/accounts/${a.id}`}
-                    className="font-medium text-avocado-900 hover:underline"
-                  >
-                    {a.name}
-                  </Link>
-                  <span className="text-sm text-avocado-700">
-                    {formatUSD(computeGoalTotal(holdingsByAccount.get(a.id) ?? []))}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <AccountBreakdownTable accounts={accountBreakdowns} collapsible={false} />
             {accountBreakdowns.length >= 2 && (
-              <>
-                <AccountBreakdownTable accounts={accountBreakdowns} />
-                <p className="text-xs text-avocado-600">
-                  Accounts are deliberately lopsided when you place bonds and stocks by tax
-                  treatment, so these show what each one holds — not drift against the goal&apos;s
-                  target.
-                </p>
-              </>
+              <p className="text-xs text-avocado-600">
+                Accounts are deliberately lopsided when you place bonds and stocks by tax treatment,
+                so these show what each one holds — not drift against the goal&apos;s target.
+              </p>
             )}
           </>
         )}

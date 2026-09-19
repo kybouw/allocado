@@ -65,9 +65,9 @@ export default async function DashboardPage() {
           {portfolioDuration != null && (
             <p
               className="text-xs text-avocado-600"
-              title="Weighted average duration across all holdings"
+              title="Weighted average duration of the bonds you hold, across every goal"
             >
-              avg duration {portfolioDuration.toFixed(2)} yr
+              bond duration {portfolioDuration.toFixed(1)} yr
             </p>
           )}
         </div>

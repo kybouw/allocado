@@ -44,8 +44,8 @@ export function GoalAllocationCard({
               </span>
               {goal.targetDate && <span>target {goal.targetDate}</span>}
               {duration != null && (
-                <span title="Weighted average duration across all holdings — bonds at their duration, cash and equity counted as 0 years">
-                  avg duration {duration.toFixed(2)} yr
+                <span title="Weighted average duration of this goal's bonds. Roughly how long a change in interest rates takes to wash out.">
+                  bond duration {duration.toFixed(1)} yr
                 </span>
               )}
             </div>

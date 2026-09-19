@@ -16,6 +16,8 @@ export type AssetTypeRow = {
 export type AssetRow = {
   id: string;
   avgDurationYears: string | null;
+  /** Share of the asset that is bonds (0-100). Weights the duration average. */
+  bondPct: string;
 };
 
 export type TargetRow = {
@@ -98,30 +100,46 @@ export function resolveActiveTargets(
 }
 
 /**
- * Weighted average duration across all of a goal's holdings.
- * Bonds use their avgDurationYears; cash and equity count as 0.
- * Weight = holding value. Returns null when no bond exposure exists.
+ * Weighted average duration of a goal's BOND SLEEVE.
+ *
+ * Both sums are over bond dollars only, so the result answers "how rate-sensitive
+ * are the bonds I hold?" and is directly comparable to a time horizon. Dividing by
+ * the whole portfolio instead would blend in stocks and cash, which have no duration,
+ * and report a number that falls as the rest of the goal grows — a goal that is 20%
+ * bonds at 5 years would read 1.0, which is not the duration of anything.
+ *
+ * A fund that is only partly bonds contributes just its bond portion: a balanced fund
+ * tagged 40% bonds at duration 6 brings 0.4 x value of bond dollars, not its full value.
+ *
+ * Returns null when the goal holds no bonds with a known duration.
  */
 export function computeWeightedBondDuration(
   holdings: HoldingRow[],
   assets: AssetRow[],
 ): number | null {
-  const byId = new Map(assets.map((a) => [a.id, a.avgDurationYears] as const));
+  const byId = new Map(assets.map((a) => [a.id, a] as const));
   let weightedSum = 0;
-  let totalValue = 0;
-  let hasBonds = false;
+  let bondValue = 0;
+
   for (const h of holdings) {
     const v = Number(h.value);
     if (!Number.isFinite(v) || v <= 0) continue;
-    totalValue += v;
-    const dur = byId.get(h.assetId);
-    if (dur == null) continue;
-    const d = Number(dur);
-    if (!Number.isFinite(d) || d === 0) continue;
-    weightedSum += d * v;
-    hasBonds = true;
+
+    const asset = byId.get(h.assetId);
+    if (!asset) continue;
+
+    const d = Number(asset.avgDurationYears);
+    if (!Number.isFinite(d) || d <= 0) continue;
+
+    const bondShare = Number(asset.bondPct) / 100;
+    if (!Number.isFinite(bondShare) || bondShare <= 0) continue;
+
+    const dollars = v * bondShare;
+    weightedSum += d * dollars;
+    bondValue += dollars;
   }
-  return hasBonds && totalValue > 0 ? weightedSum / totalValue : null;
+
+  return bondValue > 0 ? weightedSum / bondValue : null;
 }
 
 export type ProvenanceHolding = {

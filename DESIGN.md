@@ -58,7 +58,11 @@ asset_class_type: stock | bond | cash | other
 - **Goal total value** = SUM(holdings.value) across all accounts assigned to that goal
 - **Current allocation %** = SUM(holdings.value × asset_class_allocations.ratio / 100) per asset class ÷ goal total
 - **Drift** = current % − target %
-- **Weighted avg bond duration** = SUM(holdings.value × assets.avg_duration_years) ÷ SUM(holdings.value for bond-tagged assets)
+- **Weighted avg bond duration** = SUM(bond dollars × assets.avg_duration_years) ÷ SUM(bond dollars),
+  where a holding's bond dollars = `holdings.value × assets.bond_pct / 100`. Both sums cover the
+  bond sleeve only, so the result is comparable to a time horizon. Dividing by the whole goal
+  would blend in stocks and cash, which have no duration, and give a figure that shrinks as the
+  rest of the goal grows.
 
 ---
 
@@ -93,7 +97,7 @@ asset_class_type: stock | bond | cash | other
 
 ## Domain Notes
 
-**Bond duration.** For medium/short-term goals, weighted average bond duration should stay below the time horizon. The app surfaces this on the dashboard per-goal.
+**Bond duration.** For medium/short-term goals, weighted average bond duration should stay below the time horizon — roughly, a rate shock should have time to wash out before you spend the money. The goal detail page states this as a verdict in the "What you have" section, since duration is measured from the holdings rather than from the target.
 
 **Multi-class assets.** Funds can hold multiple asset classes. Allocation is computed by rolling holdings through the `asset_class_allocations` ratio table. Tags across independent dimensions (region, cap size, duration, tax treatment) do not need to sum to 100% collectively — only within a single dimension.
 

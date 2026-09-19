@@ -3,7 +3,6 @@
 import { setStaticTargets } from "@allocado/app/_actions/targets";
 import { TYPE_COLORS } from "@allocado/components/allocation/constants";
 import { Checkbox } from "@allocado/components/ui/checkbox";
-import { DialogClose } from "@allocado/components/ui/dialog";
 import { Slider } from "@allocado/components/ui/slider";
 import { useMemo, useRef, useState, useTransition } from "react";
 
@@ -328,11 +327,6 @@ export function TargetsEditor({
           </span>
         )}
         <div className="ml-auto flex items-center gap-3">
-          <DialogClose asChild>
-            <button type="button" className="btn-secondary">
-              Cancel
-            </button>
-          </DialogClose>
           <button type="button" onClick={save} disabled={isPending} className="btn-primary">
             {isPending ? "Saving…" : "Save target"}
           </button>

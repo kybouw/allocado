@@ -42,99 +42,39 @@ function roundAndReconcile(pct: ClassPct, activeKeys: ClassKey[]): ClassPct {
   return result;
 }
 
-/** Sets `changedKey` to `rawNewValue` and scales the other active classes proportionally
- * so they still fill the remaining space — this is what makes typing and dragging behave
- * the same way, and what makes "must sum to 100%" impossible to violate. */
-function redistribute(
+/** The class list is a fixed left-to-right pinning order: editing one class should never disturb
+ * a class further to its left. The change cascades into classes to the right first (nearest
+ * first), and only falls back to the left — again nearest first — if the changed class is the
+ * rightmost checked one and has nowhere else to push into. This is the one rule behind dragging,
+ * typing, and unchecking (which is just "set to 0, then drop from the active set"): no history to
+ * track, no ambiguity about which edit "locked" a value — position alone decides what flexes. */
+function redistributeCascade(
   pct: ClassPct,
   activeKeys: ClassKey[],
   changedKey: ClassKey,
   rawNewValue: number,
 ): ClassPct {
-  const newValue = Math.min(100, Math.max(0, rawNewValue));
-  const others = activeKeys.filter((key) => key !== changedKey);
-
-  if (others.length === 0) {
+  if (activeKeys.length <= 1) {
     return roundAndReconcile({ ...pct, [changedKey]: 100 }, activeKeys);
   }
 
-  const targetOthersTotal = 100 - newValue;
-  const othersTotal = others.reduce((s, key) => s + pct[key], 0);
-  const next: ClassPct = { ...pct, [changedKey]: newValue };
+  const newValue = Math.min(100, Math.max(0, rawNewValue));
+  const changedIndex = activeKeys.indexOf(changedKey);
+  const order = [
+    ...activeKeys.slice(changedIndex + 1),
+    ...activeKeys.slice(0, changedIndex).reverse(),
+  ];
 
-  if (othersTotal > 0) {
-    const scale = targetOthersTotal / othersTotal;
-    for (const key of others) next[key] = pct[key] * scale;
-  } else {
-    const even = targetOthersTotal / others.length;
-    for (const key of others) next[key] = even;
+  const next: ClassPct = { ...pct, [changedKey]: newValue };
+  let remaining = pct[changedKey] - newValue;
+  for (const key of order) {
+    if (Math.abs(remaining) < 1e-9) break;
+    const target = Math.min(100, Math.max(0, next[key] + remaining));
+    remaining -= target - next[key];
+    next[key] = target;
   }
 
   return roundAndReconcile(next, activeKeys);
-}
-
-/** Unchecking should feel like the rest of the class list is static, not like everything just got
- * reshuffled — so the removed class's percentage goes entirely to its nearest remaining checked
- * neighbor, preferring the one to the right (CLASSES order), not spread across everyone. Classes
- * further away, especially ones to the left, are left exactly as they were. */
-function redistributeOnUncheck(
-  pct: ClassPct,
-  activeKeys: ClassKey[],
-  removedKey: ClassKey,
-): ClassPct {
-  const removedIndex = CLASSES.indexOf(removedKey);
-  const remaining = activeKeys.filter((key) => key !== removedKey);
-
-  const [absorber] = [...remaining].sort((a, b) => {
-    const da = CLASSES.indexOf(a) - removedIndex;
-    const db = CLASSES.indexOf(b) - removedIndex;
-    if (da > 0 !== db > 0) return da > 0 ? -1 : 1;
-    return Math.abs(da) - Math.abs(db);
-  });
-
-  const next: ClassPct = { ...pct, [removedKey]: 0, [absorber]: pct[absorber] + pct[removedKey] };
-  return roundAndReconcile(next, remaining);
-}
-
-/** Typing is different from dragging: once you've manually typed a value into a field, later
- * edits to OTHER fields must leave it alone — otherwise you can never dial in an exact split by
- * typing each field in turn. `recency` lists the other classes the user has already typed into,
- * most-recently-typed first. Exactly one untouched (or longest-untouched) class absorbs the whole
- * remainder; if it can't fit, the edit is rejected outright rather than disturbing a locked class. */
-function redistributeTyped(
-  pct: ClassPct,
-  activeKeys: ClassKey[],
-  changedKey: ClassKey,
-  rawNewValue: number,
-  recency: ClassKey[],
-): ClassPct {
-  const newValue = Math.min(100, Math.max(0, rawNewValue));
-  const others = activeKeys.filter((key) => key !== changedKey);
-
-  if (others.length === 0) {
-    return roundAndReconcile({ ...pct, [changedKey]: 100 }, activeKeys);
-  }
-
-  if (!others.some((key) => recency.includes(key))) {
-    // Nothing else has been explicitly typed yet — this is like the very first edit,
-    // so spread the change proportionally instead of picking a class to favor.
-    return redistribute(pct, activeKeys, changedKey, newValue);
-  }
-
-  const flexKey =
-    others.find((key) => !recency.includes(key)) ??
-    [...others].sort((a, b) => recency.indexOf(b) - recency.indexOf(a))[0];
-  const heldTotal = others.filter((key) => key !== flexKey).reduce((sum, key) => sum + pct[key], 0);
-  const flexTarget = 100 - newValue - heldTotal;
-
-  if (flexTarget < -0.005 || flexTarget > 100.005) {
-    return pct;
-  }
-
-  return roundAndReconcile(
-    { ...pct, [changedKey]: newValue, [flexKey]: Math.min(100, Math.max(0, flexTarget)) },
-    activeKeys,
-  );
 }
 
 function boundariesToPct(boundaries: number[], activeKeys: ClassKey[]): ClassPct {
@@ -188,7 +128,6 @@ export function TargetsEditor({
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
-  const lastTypedRef = useRef<ClassKey[]>([]);
 
   const activeKeys = useMemo(() => CLASSES.filter((key) => checked[key]), [checked]);
   const boundaries = useMemo(() => pctToBoundaries(pct, activeKeys), [pct, activeKeys]);
@@ -215,18 +154,15 @@ export function TargetsEditor({
   function handleNumberChange(key: ClassKey, raw: string) {
     const value = Number(raw);
     if (Number.isNaN(value)) return;
-    const recency = lastTypedRef.current.filter((k) => k !== key);
-    lastTypedRef.current = [key, ...recency];
-    applyPct(redistributeTyped(pct, activeKeys, key, value, recency));
+    applyPct(redistributeCascade(pct, activeKeys, key, value));
   }
 
   function handleCheckedChange(key: ClassKey, next: boolean) {
     if (!next) {
       if (activeKeys.length <= 1) return;
-      lastTypedRef.current = lastTypedRef.current.filter((k) => k !== key);
       setState({
         checked: { ...checked, [key]: false },
-        pct: redistributeOnUncheck(pct, activeKeys, key),
+        pct: redistributeCascade(pct, activeKeys, key, 0),
       });
       setFeedback(null);
       return;

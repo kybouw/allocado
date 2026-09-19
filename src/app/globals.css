@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/*
+ * Allocado has one theme. Without this, Tailwind v4's `dark:` variant defaults to
+ * the prefers-color-scheme media query, so on a dark-mode machine every `dark:`
+ * utility in the shadcn components activates while the tokens it references still
+ * hold their LIGHT values — `dark:bg-input/30` on an outline button resolves to
+ * avocado-300 at 30% (a green), and `dark:bg-destructive/60` washes the delete
+ * button out until it reads as disabled.
+ *
+ * Scoping the variant to an explicit `.dark` ancestor, which nothing adds, makes
+ * those utilities inert and the light theme render consistently. If a real dark
+ * theme is ever wanted, define the token values under `.dark` and add a toggle —
+ * this line is already the right shape for that.
+ */
+@custom-variant dark (&:is(.dark *));
+
 /* ---------- Base theme ---------- */
 
 :root {

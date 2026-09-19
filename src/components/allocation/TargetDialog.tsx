@@ -35,9 +35,7 @@ export function TargetDialog({ editor, hasTargets }: { editor: ReactNode; hasTar
         <DialogHeader>
           <DialogTitle>Target allocation</DialogTitle>
           <DialogDescription>
-            How you want this goal invested. Stocks, bonds and cash must add to 100%. Gold, crypto
-            and commodities are never targeted — they share no place on a risk scale, so Allocado
-            reports what you hold without forming an opinion about it.
+            How you want this goal split across stocks, bonds, and cash.
           </DialogDescription>
         </DialogHeader>
         {editor}

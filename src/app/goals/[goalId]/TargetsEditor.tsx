@@ -73,6 +73,29 @@ function redistribute(
   return roundAndReconcile(next, activeKeys);
 }
 
+/** Unchecking should feel like the rest of the class list is static, not like everything just got
+ * reshuffled — so the removed class's percentage goes entirely to its nearest remaining checked
+ * neighbor, preferring the one to the right (CLASSES order), not spread across everyone. Classes
+ * further away, especially ones to the left, are left exactly as they were. */
+function redistributeOnUncheck(
+  pct: ClassPct,
+  activeKeys: ClassKey[],
+  removedKey: ClassKey,
+): ClassPct {
+  const removedIndex = CLASSES.indexOf(removedKey);
+  const remaining = activeKeys.filter((key) => key !== removedKey);
+
+  const [absorber] = [...remaining].sort((a, b) => {
+    const da = CLASSES.indexOf(a) - removedIndex;
+    const db = CLASSES.indexOf(b) - removedIndex;
+    if (da > 0 !== db > 0) return da > 0 ? -1 : 1;
+    return Math.abs(da) - Math.abs(db);
+  });
+
+  const next: ClassPct = { ...pct, [removedKey]: 0, [absorber]: pct[absorber] + pct[removedKey] };
+  return roundAndReconcile(next, remaining);
+}
+
 /** Typing is different from dragging: once you've manually typed a value into a field, later
  * edits to OTHER fields must leave it alone — otherwise you can never dial in an exact split by
  * typing each field in turn. `recency` lists the other classes the user has already typed into,
@@ -203,7 +226,7 @@ export function TargetsEditor({
       lastTypedRef.current = lastTypedRef.current.filter((k) => k !== key);
       setState({
         checked: { ...checked, [key]: false },
-        pct: redistribute(pct, activeKeys, key, 0),
+        pct: redistributeOnUncheck(pct, activeKeys, key),
       });
       setFeedback(null);
       return;

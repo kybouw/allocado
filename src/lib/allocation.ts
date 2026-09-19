@@ -123,3 +123,92 @@ export function computeWeightedBondDuration(
   }
   return hasBonds && totalValue > 0 ? weightedSum / totalValue : null;
 }
+
+export type ProvenanceHolding = {
+  accountId: string;
+  assetId: string;
+  ticker: string;
+  assetName: string;
+  value: string;
+};
+
+export type ProvenanceEntry = {
+  accountId: string;
+  assetId: string;
+  ticker: string;
+  assetName: string;
+  /** Dollars this holding contributes to this asset class, after its class ratio. */
+  dollars: number;
+  /** Share of the class this holding accounts for (0..1). */
+  shareOfClass: number;
+};
+
+/**
+ * Break each asset class down into the holdings that produced it.
+ *
+ * A fund tagged 60% stocks / 40% bonds contributes to both, so one holding can
+ * appear under more than one class with a different dollar amount each time —
+ * which is exactly the question "where did this cash come from?" needs answered.
+ */
+export function computeTypeProvenance(
+  holdings: ProvenanceHolding[],
+  assetTypes: AssetTypeRow[],
+): Map<AssetType, ProvenanceEntry[]> {
+  const byId = new Map(assetTypes.map((a) => [a.id, a]));
+  const out = new Map<AssetType, ProvenanceEntry[]>([
+    ["stock", []],
+    ["bond", []],
+    ["cash", []],
+    ["other", []],
+  ]);
+
+  for (const h of holdings) {
+    const value = Number(h.value);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const a = byId.get(h.assetId);
+    if (!a) continue;
+
+    const ratios: Array<[AssetType, string]> = [
+      ["stock", a.stockPct],
+      ["bond", a.bondPct],
+      ["cash", a.cashPct],
+      ["other", a.otherPct],
+    ];
+
+    for (const [type, pct] of ratios) {
+      const dollars = value * (Number(pct) / 100);
+      if (!Number.isFinite(dollars) || dollars <= 0.005) continue;
+      out.get(type)?.push({
+        accountId: h.accountId,
+        assetId: h.assetId,
+        ticker: h.ticker,
+        assetName: h.assetName,
+        dollars,
+        shareOfClass: 0,
+      });
+    }
+  }
+
+  // Second pass: shares are only knowable once each class total is known.
+  for (const [, entries] of out) {
+    const classTotal = entries.reduce((acc, e) => acc + e.dollars, 0);
+    for (const e of entries) {
+      e.shareOfClass = classTotal > 0 ? e.dollars / classTotal : 0;
+    }
+    entries.sort((a, b) => b.dollars - a.dollars);
+  }
+
+  return out;
+}
+
+/**
+ * Whole years from today until a goal's target date. Null when undated,
+ * clamped at zero for dates that have already passed.
+ */
+export function yearsUntil(targetDate: string | null, asOf: Date = new Date()): number | null {
+  if (!targetDate) return null;
+  const target = new Date(`${targetDate}T00:00:00Z`);
+  if (Number.isNaN(target.getTime())) return null;
+  const ms = target.getTime() - asOf.getTime();
+  return Math.max(0, ms / (1000 * 60 * 60 * 24 * 365.25));
+}

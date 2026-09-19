@@ -25,7 +25,7 @@ export function GoalAllocationCard({
   hasHoldings: boolean;
   actions?: ReactNode;
 }) {
-  const hasTargets = targeted.some((b) => b.target > 0);
+  const hasTargets = targeted.some((b) => (b.target ?? 0) > 0);
 
   return (
     <Card>

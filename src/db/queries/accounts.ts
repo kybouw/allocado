@@ -9,6 +9,7 @@ export async function listAccounts(userId: string) {
       name: accounts.name,
       institution: accounts.institution,
       accountType: accounts.accountType,
+      minimumCashBalance: accounts.minimumCashBalance,
       notes: accounts.notes,
       createdAt: accounts.createdAt,
       goalId: accounts.goalId,

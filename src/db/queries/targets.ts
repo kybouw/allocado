@@ -9,7 +9,6 @@ export async function listTargetsForGoal(goalId: string) {
       stockTargetPct: allocationTargets.stockTargetPct,
       bondTargetPct: allocationTargets.bondTargetPct,
       cashTargetPct: allocationTargets.cashTargetPct,
-      otherTargetPct: allocationTargets.otherTargetPct,
       effectiveDate: allocationTargets.effectiveDate,
     })
     .from(allocationTargets)

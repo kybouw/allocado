@@ -22,7 +22,6 @@ export type TargetRow = {
   stockTargetPct: string;
   bondTargetPct: string;
   cashTargetPct: string;
-  otherTargetPct: string;
   effectiveDate: string | null;
 };
 
@@ -83,19 +82,18 @@ export function computeTypeFractions(
 export function resolveActiveTargets(
   targets: TargetRow[],
   asOf: Date = new Date(),
-): { stock: number; bond: number; cash: number; other: number } {
+): { stock: number; bond: number; cash: number } {
   const asOfStr = asOf.toISOString().slice(0, 10);
   const dated = targets
     .filter((r) => r.effectiveDate != null && r.effectiveDate <= asOfStr)
     // biome-ignore lint/style/noNonNullAssertion: filtered to non-null above
     .sort((a, b) => (a.effectiveDate! < b.effectiveDate! ? 1 : -1));
   const pick = dated[0] ?? targets.find((r) => r.effectiveDate == null);
-  if (!pick) return { stock: 0, bond: 0, cash: 0, other: 0 };
+  if (!pick) return { stock: 0, bond: 0, cash: 0 };
   return {
     stock: Number(pick.stockTargetPct) / 100,
     bond: Number(pick.bondTargetPct) / 100,
     cash: Number(pick.cashTargetPct) / 100,
-    other: Number(pick.otherTargetPct) / 100,
   };
 }
 

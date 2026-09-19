@@ -24,7 +24,6 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
     stockTargetPct: Number(staticTarget?.stockTargetPct ?? 0),
     bondTargetPct: Number(staticTarget?.bondTargetPct ?? 0),
     cashTargetPct: Number(staticTarget?.cashTargetPct ?? 0),
-    otherTargetPct: Number(staticTarget?.otherTargetPct ?? 0),
   };
 
   return (
@@ -100,7 +99,9 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
       <section className="card flex flex-col gap-4">
         <h2 className="text-lg font-medium text-avocado-800">Allocation targets</h2>
         <p className="text-sm text-avocado-700">
-          Set your Stocks / Bonds / Cash / Other target allocation. All four must sum to 100%.
+          Set your Stocks / Bonds / Cash target allocation. All three must sum to 100%. "Other"
+          (gold, crypto, commodities) is never targeted — it has no place on a risk scale, so the
+          app reports what you hold without pretending to have an opinion about it.
         </p>
         <TargetsEditor goalId={goalId} initialTargets={initialTargets} />
       </section>

@@ -38,7 +38,7 @@ export async function buildGoalCards(userId: string) {
       const targeted = ALL_TYPE_KEYS.map((key) => ({
         name: TYPE_DISPLAY[key],
         current: current.get(key) ?? 0,
-        target: activeTargets[key],
+        target: key === "other" ? null : activeTargets[key],
       }));
 
       const duration = computeWeightedBondDuration(holdings, assets);
@@ -60,17 +60,16 @@ export async function buildGoalCards(userId: string) {
               const acctTotal = computeGoalTotal(acctHoldings);
               const acctDollars = computeTypeDollars(acctHoldings, assets);
               const acctCurrent = computeTypeFractions(acctDollars, acctTotal);
-              const acctTargeted = ALL_TYPE_KEYS.map((key) => ({
+              const acctSlices = ALL_TYPE_KEYS.map((key) => ({
                 name: TYPE_DISPLAY[key],
                 current: acctCurrent.get(key) ?? 0,
-                target: activeTargets[key],
               }));
               return {
                 accountId: acct.id,
                 accountName: acct.name,
                 accountType: acct.accountType,
                 total: acctTotal,
-                targeted: acctTargeted,
+                slices: acctSlices,
               };
             })
           : [];

@@ -19,12 +19,16 @@ export const TYPE_COLORS: Record<TypeName, string> = {
 
 export const ROW_H = "h-9";
 
-export type AllocationSlice = { name: TypeName; current: number; target: number };
+/** `target` is null for classes that cannot be targeted — only "Other" today. */
+export type AllocationSlice = { name: TypeName; current: number; target: number | null };
+
+/** Per-account slices carry no target: a goal's target says nothing about any one account. */
+export type AccountSlice = { name: TypeName; current: number };
 
 export type AccountBreakdown = {
   accountId: string;
   accountName: string;
   accountType: string;
   total: string;
-  targeted: AllocationSlice[];
+  slices: AccountSlice[];
 };

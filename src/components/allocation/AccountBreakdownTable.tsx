@@ -6,7 +6,7 @@ import { StackedBar } from "./StackedBar";
 
 export function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown[] }) {
   const showOther = accounts.some((a) =>
-    a.targeted.find((b) => b.name === "Other" && b.current > 0.001),
+    a.slices.find((b) => b.name === "Other" && b.current > 0.001),
   );
   const colClass = showOther ? "grid-cols-4" : "grid-cols-3";
   const tableWidth = showOther ? "w-64" : "w-52";
@@ -41,8 +41,8 @@ export function AccountBreakdownTable({ accounts }: { accounts: AccountBreakdown
         {accounts.map((acct) => {
           const isTaxAdvantaged = TAX_ADVANTAGED_TYPES.has(acct.accountType);
           const visibleSlices = showOther
-            ? acct.targeted
-            : acct.targeted.filter((b) => b.name !== "Other");
+            ? acct.slices
+            : acct.slices.filter((b) => b.name !== "Other");
           const currentSlices = visibleSlices.map((b) => ({
             key: b.name,
             pct: b.current,

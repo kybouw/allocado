@@ -23,6 +23,7 @@ type AccountFormValues = {
   goalId: string;
   accountType: string;
   institution: string | null;
+  minimumCashBalance: string | null;
   notes: string | null;
 };
 
@@ -147,6 +148,26 @@ export function AccountFormDialog({
               defaultValue={account?.institution ?? ""}
               className="input-field"
             />
+          </div>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label htmlFor="account-min-cash" className="text-sm font-medium text-avocado-700">
+              Required cash balance
+            </label>
+            <input
+              id="account-min-cash"
+              name="minimumCashBalance"
+              type="number"
+              min={0}
+              step="0.01"
+              inputMode="decimal"
+              placeholder="e.g. 2000"
+              defaultValue={account?.minimumCashBalance ?? ""}
+              className="input-field"
+            />
+            <p className="text-xs text-avocado-600">
+              Cash this account forces you to keep — an HSA debit-card floor, for example. Leave
+              blank if there is no requirement.
+            </p>
           </div>
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label htmlFor="account-notes" className="text-sm font-medium text-avocado-700">

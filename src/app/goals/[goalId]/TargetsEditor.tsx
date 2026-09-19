@@ -97,6 +97,15 @@ function pctToBoundaries(pct: ClassPct, activeKeys: ClassKey[]): number[] {
   return boundaries;
 }
 
+/** Vanguard's LifeStrategy funds as one-click starting points for people who don't want to build
+ * a custom split — stocks/bonds only, no cash, matching what those funds actually hold. */
+const PRESETS: { label: string; stock: number; bond: number }[] = [
+  { label: "Income", stock: 20, bond: 80 },
+  { label: "Conservative Growth", stock: 40, bond: 60 },
+  { label: "Moderate Growth", stock: 60, bond: 40 },
+  { label: "Growth", stock: 80, bond: 20 },
+];
+
 function initialState(initialTargets: InitialTargets): { checked: ClassChecked; pct: ClassPct } {
   const raw: ClassPct = {
     stock: initialTargets.stockTargetPct,
@@ -128,6 +137,7 @@ export function TargetsEditor({
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
+  const stashRef = useRef<Partial<ClassPct>>({});
 
   const activeKeys = useMemo(() => CLASSES.filter((key) => checked[key]), [checked]);
   const boundaries = useMemo(() => pctToBoundaries(pct, activeKeys), [pct, activeKeys]);
@@ -160,6 +170,7 @@ export function TargetsEditor({
   function handleCheckedChange(key: ClassKey, next: boolean) {
     if (!next) {
       if (activeKeys.length <= 1) return;
+      stashRef.current[key] = pct[key];
       setState({
         checked: { ...checked, [key]: false },
         pct: redistributeCascade(pct, activeKeys, key, 0),
@@ -168,10 +179,24 @@ export function TargetsEditor({
       return;
     }
 
-    // Adding a class at 0% needs no room from anyone else — the checked classes
-    // already sum to 100, and 0 doesn't disturb that. Whatever split you'd built
-    // up stays exactly as it was; drag or type into the new class to give it a share.
-    setState({ checked: { ...checked, [key]: true }, pct: { ...pct, [key]: 0 } });
+    // Adding a class at 0% needs no room from anyone else — the checked classes already
+    // sum to 100, and 0 doesn't disturb that. If it had a stashed value from being
+    // unchecked earlier, restore it the same way any other edit would — cascading the
+    // room for it out of its neighbors — so re-checking undoes the uncheck exactly.
+    const newActiveKeys = CLASSES.filter((c) => checked[c] || c === key);
+    const restored = stashRef.current[key] ?? 0;
+    setState({
+      checked: { ...checked, [key]: true },
+      pct: redistributeCascade({ ...pct, [key]: 0 }, newActiveKeys, key, restored),
+    });
+    setFeedback(null);
+  }
+
+  function applyPreset(stock: number, bond: number) {
+    setState({
+      checked: { stock: true, bond: true, cash: false },
+      pct: roundAndReconcile({ stock, bond, cash: 0 }, ["stock", "bond"]),
+    });
     setFeedback(null);
   }
 
@@ -209,6 +234,20 @@ export function TargetsEditor({
               {CLASS_LABEL[key]}
             </label>
           </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-avocado-700">Presets</span>
+        {PRESETS.map(({ label, stock, bond }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => applyPreset(stock, bond)}
+            className="rounded-full border border-avocado-300 px-3 py-1 text-xs font-medium text-avocado-700 transition hover:bg-avocado-50"
+          >
+            {label}
+          </button>
         ))}
       </div>
 

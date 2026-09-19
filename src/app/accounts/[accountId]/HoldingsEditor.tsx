@@ -6,7 +6,7 @@ import { RemoveRowButton } from "@allocado/components/ui/buttons/RemoveRowButton
 import { SecondaryButton } from "@allocado/components/ui/buttons/SecondaryButton";
 import { SubmitButton } from "@allocado/components/ui/buttons/SubmitButton";
 import { UnlinkRowButton } from "@allocado/components/ui/buttons/UnlinkRowButton";
-import { formatUSD } from "@allocado/lib/money";
+import { formatMoneyForInput, formatUSD, limitDecimalInput } from "@allocado/lib/money";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -35,7 +35,7 @@ function rowsFromHoldings(holdings: Holding[]): Row[] {
     assetId: h.assetId,
     ticker: h.ticker,
     assetName: h.assetName,
-    value: h.value,
+    value: formatMoneyForInput(h.value),
   }));
 }
 
@@ -209,7 +209,9 @@ export function HoldingsEditor({
                     required
                     disabled={isManaged}
                     value={row.value}
-                    onChange={(e) => updateRow(row.key, { value: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.key, { value: limitDecimalInput(e.target.value) })
+                    }
                     className="input-field disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>

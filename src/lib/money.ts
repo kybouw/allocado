@@ -31,6 +31,28 @@ export function parseMoneyInput(input: string): string {
   return cleaned;
 }
 
+/**
+ * Clamp a raw text-field value to at most `maxDecimals` fraction digits as the
+ * user types (dollar amounts don't need the sub-cent precision the DB keeps
+ * around for aggregation). Keeps a trailing "." while mid-edit and drops any
+ * non-numeric characters.
+ */
+export function limitDecimalInput(raw: string, maxDecimals = 2): string {
+  let cleaned = raw.replace(/[^\d.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replaceAll(".", "");
+  }
+  const [whole, frac] = cleaned.split(".");
+  return frac === undefined ? cleaned : `${whole}.${frac.slice(0, maxDecimals)}`;
+}
+
+/** Format a numeric(19,4) DB string down to 2 decimals for a plain money input field. */
+export function formatMoneyForInput(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : value;
+}
+
 /** Convert an API-provided float (e.g. Plaid) to a string suitable for numeric(19,4). */
 export function moneyFromNumber(n: number): string {
   if (!Number.isFinite(n)) {

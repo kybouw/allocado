@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@allocado/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@allocado/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@allocado/components/ui/tooltip";
 import { Loader2, Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
@@ -76,27 +77,44 @@ export function AccountDialog({
         if (!isPending) setOpen(v);
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Pencil className="size-3.5" />
-          Edit account
-        </Button>
-      </DialogTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Edit account">
+              <Pencil className="size-4" />
+            </Button>
+          </DialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Edit account</TooltipContent>
+      </Tooltip>
 
-      <DialogContent className="max-h-[85vh] sm:max-w-3xl">
+      {/*
+        Width and height are both pinned to small-viewport units rather than to
+        percentages of a containing block, so the dialog behaves the same on a phone
+        as on a desktop and does not resize when mobile browser chrome slides away.
+      */}
+      <DialogContent className="grid-rows-[auto_1fr] h-[min(560px,85svh)] max-sm:max-w-[calc(100svw-2rem)] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{account.name}</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="general" className="min-h-0">
+        <Tabs defaultValue="general" className="flex min-h-0 flex-col">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             {showSync && <TabsTrigger value="sync">Automatic sync</TabsTrigger>}
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
           </TabsList>
 
-          {/* Only the panel scrolls, so the tab bar stays put. */}
-          <TabsContent value="general" className="max-h-[60vh] overflow-y-auto px-1 pt-2">
+          {/*
+            The dialog's own height is fixed, and each panel flexes to fill whatever is
+            left, so switching tabs never resizes the window — only the contents change.
+            Panels scroll individually, which also keeps the tab bar in place.
+
+            svh rather than vh so mobile browser chrome sliding in and out does not
+            change the height mid-use, and the 560px cap keeps it from becoming a
+            full-screen sheet on a tall phone.
+          */}
+          <TabsContent value="general" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <AccountGeneralForm account={account} goals={goals} idPrefix="account-dialog" />
               <div className="sm:col-span-2">
@@ -109,7 +127,7 @@ export function AccountDialog({
           </TabsContent>
 
           {showSync && (
-            <TabsContent value="sync" className="max-h-[60vh] overflow-y-auto px-1 pt-2">
+            <TabsContent value="sync" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
               <AccountSyncCard
                 accountId={sync.accountId}
                 link={sync.link}
@@ -121,7 +139,7 @@ export function AccountDialog({
             </TabsContent>
           )}
 
-          <TabsContent value="holdings" className="max-h-[60vh] overflow-y-auto px-1 pt-2">
+          <TabsContent value="holdings" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
             {holdingsEditor}
           </TabsContent>
         </Tabs>

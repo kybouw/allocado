@@ -18,6 +18,14 @@
 /* ---------- Base theme ---------- */
 
 :root {
+  /*
+   * Allocado is a light-mode app. This tells the browser so, which keeps the UI
+   * IT draws — date pickers, select dropdowns, scrollbars, autofill highlights —
+   * light on a dark-mode machine. The `dark:` custom-variant above handles our own
+   * utilities; this handles the parts of the page we do not style.
+   */
+  color-scheme: light;
+
   --background: #ffffff;
   --foreground: #171717;
 

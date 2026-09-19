@@ -101,8 +101,8 @@ export function AccountDialog({
         <Tabs defaultValue="general" className="flex min-h-0 flex-col">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            {showSync && <TabsTrigger value="sync">Automatic sync</TabsTrigger>}
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            {showSync && <TabsTrigger value="sync">Automatic sync</TabsTrigger>}
           </TabsList>
 
           {/*
@@ -126,6 +126,10 @@ export function AccountDialog({
             </form>
           </TabsContent>
 
+          <TabsContent value="holdings" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
+            {holdingsEditor}
+          </TabsContent>
+
           {showSync && (
             <TabsContent value="sync" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
               <AccountSyncCard
@@ -138,10 +142,6 @@ export function AccountDialog({
               />
             </TabsContent>
           )}
-
-          <TabsContent value="holdings" className="min-h-0 flex-1 overflow-y-auto px-1 pt-2">
-            {holdingsEditor}
-          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>

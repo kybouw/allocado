@@ -1,5 +1,8 @@
 import { AlertTriangle, CalendarClock, Check } from "lucide-react";
 
+/** Years beyond which a duration/horizon mismatch is no longer the risk worth naming. */
+const LONG_HORIZON_YEARS = 10;
+
 /**
  * Bond duration read against the goal's time horizon.
  *
@@ -22,6 +25,18 @@ export function HorizonNote({
       </Note>
     );
   }
+
+  // Past this horizon the duration check stops being the decisive risk. Over decades,
+  // sequence-of-returns on the equity side dominates a rate mismatch by a wide margin,
+  // and a warning that is technically live but never the thing that matters is how
+  // people learn to ignore warnings. Staying silent is the more useful answer.
+  //
+  // This threshold is a stand-in for the real fix (KB-39): compare the bond sleeve to
+  // the duration of the LIABILITY rather than to a raw date. A goal drawn down over
+  // 30 years has a liability duration nearer 12-15 years than 30, so long bonds in a
+  // retirement account are close to matched rather than dangerously long. Once goals
+  // carry a shape, this cutoff can go.
+  if (years > LONG_HORIZON_YEARS) return null;
 
   const yearsLabel = years < 1 ? "less than a year" : `about ${Math.round(years)} years`;
 

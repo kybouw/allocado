@@ -209,14 +209,10 @@ export function TargetsEditor({
       return;
     }
 
-    const newActive = CLASSES.filter((c) => checked[c] || c === key);
-    const share = 100 / newActive.length;
-    const scale = (100 - share) / 100;
-    const raw: ClassPct = { ...pct };
-    for (const other of activeKeys) raw[other] = pct[other] * scale;
-    raw[key] = share;
-
-    setState({ checked: { ...checked, [key]: true }, pct: roundAndReconcile(raw, newActive) });
+    // Adding a class at 0% needs no room from anyone else — the checked classes
+    // already sum to 100, and 0 doesn't disturb that. Whatever split you'd built
+    // up stays exactly as it was; drag or type into the new class to give it a share.
+    setState({ checked: { ...checked, [key]: true }, pct: { ...pct, [key]: 0 } });
     setFeedback(null);
   }
 

@@ -8,7 +8,7 @@ import {
 import { GoalAllocationCard } from "@allocado/components/allocation/GoalAllocationCard";
 import { StackedBar } from "@allocado/components/allocation/StackedBar";
 import { requireUserId } from "@allocado/db/auth";
-import { computeTypeFractions, computeWeightedBondDuration } from "@allocado/lib/allocation";
+import { computeTypeFractions } from "@allocado/lib/allocation";
 import { buildGoalCards } from "@allocado/lib/goal-cards";
 import { formatPercent, formatUSD } from "@allocado/lib/money";
 import Link from "next/link";
@@ -16,7 +16,7 @@ import Link from "next/link";
 export default async function DashboardPage() {
   const userId = await requireUserId();
 
-  const { goals, assets, goalCards } = await buildGoalCards(userId);
+  const { goals, goalCards } = await buildGoalCards(userId);
 
   const portfolioTotal = goalCards.reduce((acc, c) => acc + Number(c.total), 0);
 
@@ -37,9 +37,6 @@ export default async function DashboardPage() {
     current: portfolioFractions.get(key) ?? 0,
   }));
   const portfolioHasAllocation = portfolioTargeted.some((b) => b.current > 0);
-
-  const allHoldings = goalCards.flatMap((c) => c.holdings);
-  const portfolioDuration = computeWeightedBondDuration(allHoldings, assets);
 
   if (goals.length === 0) {
     return (
@@ -62,14 +59,6 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-2">
           <p className="text-sm uppercase tracking-wide text-avocado-600">Total portfolio value</p>
           <h1 className="text-4xl font-semibold text-avocado-900">{formatUSD(portfolioTotal)}</h1>
-          {portfolioDuration != null && (
-            <p
-              className="text-xs text-avocado-600"
-              title="Weighted average duration of the bonds you hold, across every goal"
-            >
-              bond duration {portfolioDuration.toFixed(1)} yr
-            </p>
-          )}
         </div>
         {portfolioHasAllocation && <PortfolioAllocationBars targeted={portfolioTargeted} />}
       </header>
@@ -81,7 +70,6 @@ export default async function DashboardPage() {
             goal={card.goal}
             total={card.total}
             targeted={card.targeted}
-            duration={card.duration}
             accountCount={card.accountCount}
             accountBreakdowns={card.accountBreakdowns}
             hasHoldings={card.hasHoldings}

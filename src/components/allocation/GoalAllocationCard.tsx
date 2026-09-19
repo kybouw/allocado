@@ -10,7 +10,6 @@ export function GoalAllocationCard({
   goal,
   total,
   targeted,
-  duration,
   accountCount,
   accountBreakdowns,
   hasHoldings,
@@ -19,7 +18,6 @@ export function GoalAllocationCard({
   goal: { id: string; name: string; targetDate: string | null };
   total: string | number;
   targeted: AllocationSlice[];
-  duration: number | null;
   accountCount: number;
   accountBreakdowns: AccountBreakdown[];
   hasHoldings: boolean;
@@ -42,12 +40,6 @@ export function GoalAllocationCard({
               <span>
                 {accountCount} account{accountCount === 1 ? "" : "s"}
               </span>
-              {goal.targetDate && <span>target {goal.targetDate}</span>}
-              {duration != null && (
-                <span title="Weighted average duration of this goal's bonds. Roughly how long a change in interest rates takes to wash out.">
-                  bond duration {duration.toFixed(1)} yr
-                </span>
-              )}
             </div>
           </div>
           <div className="flex items-start gap-3">

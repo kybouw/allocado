@@ -12,7 +12,6 @@ import {
   computeGoalTotal,
   computeTypeDollars,
   computeTypeFractions,
-  computeWeightedBondDuration,
   resolveActiveTargets,
 } from "@allocado/lib/allocation";
 
@@ -41,7 +40,6 @@ export async function buildGoalCards(userId: string) {
         target: key === "other" ? null : activeTargets[key],
       }));
 
-      const duration = computeWeightedBondDuration(holdings, assets);
       const goalAccts = accounts.filter((a) => a.goalId === g.id);
       const accountCount = goalAccts.length;
 
@@ -80,7 +78,6 @@ export async function buildGoalCards(userId: string) {
         typeDollars,
         holdings,
         targeted,
-        duration,
         accountCount,
         accountBreakdowns,
         hasHoldings: holdings.length > 0,

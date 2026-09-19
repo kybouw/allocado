@@ -155,9 +155,11 @@ function initialState(initialTargets: InitialTargets): { checked: ClassChecked; 
 export function TargetsEditor({
   goalId,
   initialTargets,
+  onSaved,
 }: {
   goalId: string;
   initialTargets: InitialTargets;
+  onSaved?: () => void;
 }) {
   const [{ checked, pct }, setState] = useState(() => initialState(initialTargets));
   const [isPending, startTransition] = useTransition();
@@ -227,7 +229,11 @@ export function TargetsEditor({
         cashTargetPct: pct.cash,
         effectiveDate: null,
       });
-      setFeedback(res.ok ? "Saved." : `Error: ${res.error}`);
+      if (res.ok) {
+        onSaved?.();
+      } else {
+        setFeedback(`Error: ${res.error}`);
+      }
     });
   }
 

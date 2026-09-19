@@ -10,16 +10,25 @@ import {
   DialogTrigger,
 } from "@allocado/components/ui/dialog";
 import { SlidersHorizontal } from "lucide-react";
-import type { ReactNode } from "react";
-import { useState } from "react";
+import type { ReactElement } from "react";
+import { cloneElement, useState } from "react";
 
 /**
  * Target allocation, edited over the goal page.
  *
  * The editor itself is passed in rather than imported so this shell does not
  * care whether it is holding the numeric form or, later, the slider tuner.
+ * `editor` comes from a Server Component, so it must stay a plain element —
+ * the `onSaved` close callback is injected here, client-side, via cloneElement
+ * rather than threaded through as a prop (functions can't cross that boundary).
  */
-export function TargetDialog({ editor, hasTargets }: { editor: ReactNode; hasTargets: boolean }) {
+export function TargetDialog({
+  editor,
+  hasTargets,
+}: {
+  editor: ReactElement<{ onSaved?: () => void }>;
+  hasTargets: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -38,7 +47,7 @@ export function TargetDialog({ editor, hasTargets }: { editor: ReactNode; hasTar
             How you want this goal split across stocks, bonds, and cash.
           </DialogDescription>
         </DialogHeader>
-        {editor}
+        {cloneElement(editor, { onSaved: () => setOpen(false) })}
       </DialogContent>
     </Dialog>
   );
